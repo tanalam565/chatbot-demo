@@ -28,7 +28,7 @@ api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 async def verify_api_key(api_key: str = Security(api_key_header)):
     """Verify API key for authentication"""
     if not config.CHATBOT_API_KEY:
-        # If no API key is configured, allow all requests (development mode)
+        # If no API key is configured, allow all requests
         return True
     
     if api_key != config.CHATBOT_API_KEY:

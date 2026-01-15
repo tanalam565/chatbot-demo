@@ -11,10 +11,10 @@ const api = axios.create({
   },
 });
 
-export const sendMessage = async (message, sessionId = null) => {
+export const sendMessage = async (messageText, sessionId = null) => {
   try {
     const response = await api.post('/chat', {
-      message,
+      message: messageText,
       session_id: sessionId,
     });
     return response.data;

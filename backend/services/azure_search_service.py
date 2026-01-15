@@ -132,7 +132,7 @@ class AzureSearchService:
                 container=container
             )
             
-            self.index_client.create_or_update_data_source_connection(data_source)
+            self.index_client.create_or_update_data_source(data_source)
             print(f"Data source '{self.datasource_name}' created/updated")
         except Exception as e:
             print(f"Error creating data source: {e}")
@@ -175,7 +175,6 @@ class AzureSearchService:
                 context="/document",
                 text_split_mode=TextSplitMode.PAGES,
                 maximum_page_length=4000,
-                page_overlap_length=500,
                 inputs=[
                     InputFieldMappingEntry(name="text", source="/document/merged_content")
                 ],
