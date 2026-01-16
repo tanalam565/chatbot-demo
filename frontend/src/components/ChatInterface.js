@@ -56,20 +56,29 @@ function ChatInterface() {
       <div className="messages-container">
         {messages.length === 0 && (
           <div className="welcome-message">
-            <h2>Welcome to Yottareal Assistant</h2>
+            <h2>Welcome to YottaReal Assistant</h2>
             <p>Ask me anything about property management policies, procedures, or guidelines.</p>
+            <p>I can help you with move-out procedures, lease agreements, maintenance policies, and more.</p>
           </div>
         )}
         
         {messages.map((message, index) => (
-          <div key={index} className={`message ${message.role}`}>
+          <div key={index} className={`message ${message.role} ${message.error ? 'error' : ''}`}>
             <div className="message-content">
+              <div className="message-header">
+                <span className="message-label">
+                  {message.role === 'user' ? 'You' : 'Yotta'}
+                </span>
+                <span className="message-time">
+                  {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </span>
+              </div>
               <div className="message-text">{message.content}</div>
               
               {message.sources && message.sources.length > 0 && (
                 <div className="citations">
                   <div className="citations-header">
-                    <strong>📄 Citations</strong>
+                    <strong>Citations:</strong>
                   </div>
                   <ul className="citations-list">
                     {message.sources.map((source, idx) => (
@@ -87,19 +96,20 @@ function ChatInterface() {
                 </div>
               )}
             </div>
-            <div className="message-timestamp">
-              {message.timestamp.toLocaleTimeString()}
-            </div>
           </div>
         ))}
         
         {loading && (
           <div className="message assistant loading">
             <div className="message-content">
-              <div className="typing-indicator">
-                <span></span>
-                <span></span>
-                <span></span>
+              <div className="message-timestamp">Yotta</div>
+              <div style={{ display: 'flex', alignItems: 'center' }}>
+                <div className="typing-indicator">
+                  <span></span>
+                  <span></span>
+                  <span></span>
+                </div>
+                <span className="typing-text">Yotta is typing...</span>
               </div>
             </div>
           </div>
@@ -113,7 +123,7 @@ function ChatInterface() {
           type="text"
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder="Ask a question about property management..."
+          placeholder="Type a message..."
           disabled={loading}
           className="message-input"
         />
