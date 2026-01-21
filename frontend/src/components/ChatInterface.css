@@ -135,6 +135,32 @@
   text-align: right;
 }
 
+.copy-button {
+  margin-top: 8px;
+  padding: 4px 10px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-size: 11px;
+  color: var(--purple);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 500;
+}
+
+.copy-button:hover {
+  background: var(--purple);
+  color: white;
+  border-color: var(--purple);
+}
+
+.copy-button:active {
+  transform: scale(0.98);
+}
+
 .typing-indicator {
   display: flex;
   gap: 0.25rem;
@@ -365,6 +391,12 @@
   .citation-filename {
     font-size: 11px;
   }
+
+  .copy-button {
+    font-size: 10px;
+    padding: 3px 8px;
+    margin-top: 6px;
+  }
 }
 
 @media (max-width: 480px) {
@@ -460,6 +492,12 @@
 
   .typing-text {
     font-size: 12px;
+  }
+
+  .copy-button {
+    font-size: 9px;
+    padding: 2px 6px;
+    margin-top: 6px;
   }
 }
 

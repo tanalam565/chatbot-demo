@@ -7,6 +7,7 @@ function ChatInterface() {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [sessionId, setSessionId] = useState(null);
+  const [copiedIndex, setCopiedIndex] = useState(null);
   const messagesEndRef = useRef(null);
 
   const scrollToBottom = () => {
@@ -14,8 +15,17 @@ function ChatInterface() {
   };
 
   useEffect(() => {
-    scrollToBottom();
+    scrollToBottom(); 
   }, [messages]);
+
+  const handleCopy = (text, index) => {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopiedIndex(index);
+      setTimeout(() => setCopiedIndex(null), 2000);
+    }).catch(err => {
+      console.error('Failed to copy:', err);
+    });
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -74,6 +84,16 @@ function ChatInterface() {
                 </span>
               </div>
               <div className="message-text">{message.content}</div>
+              
+              {message.role === 'assistant' && !message.error && (
+                <button 
+                  className="copy-button"
+                  onClick={() => handleCopy(message.content, index)}
+                  title="Copy message"
+                >
+                  {copiedIndex === index ? '✓ Copied' : '📋 Copy'}
+                </button>
+              )}
               
               {message.sources && message.sources.length > 0 && (
                 <div className="citations">

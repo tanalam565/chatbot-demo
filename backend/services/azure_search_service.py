@@ -1,5 +1,5 @@
 from azure.search.documents import SearchClient
-from azure.search.documents.indexes import SearchIndexClient
+from azure.search.documents.indexes import SearchIndexClient, SearchIndexerClient
 from azure.search.documents.indexes.models import (
     SearchIndex,
     SimpleField,
@@ -37,6 +37,10 @@ class AzureSearchService:
             credential=self.credential
         )
         self.index_client = SearchIndexClient(
+            endpoint=self.endpoint,
+            credential=self.credential
+        )
+        self.indexer_client = SearchIndexerClient(
             endpoint=self.endpoint,
             credential=self.credential
         )
@@ -132,7 +136,7 @@ class AzureSearchService:
                 container=container
             )
             
-            self.index_client.create_or_update_data_source(data_source)
+            self.indexer_client.create_or_update_data_source_connection(data_source)
             print(f"Data source '{self.datasource_name}' created/updated")
         except Exception as e:
             print(f"Error creating data source: {e}")
@@ -189,7 +193,7 @@ class AzureSearchService:
                 skills=[ocr_skill, merge_skill, split_skill]
             )
             
-            self.index_client.create_or_update_skillset(skillset)
+            self.indexer_client.create_or_update_skillset(skillset)
             print(f"Skillset '{self.skillset_name}' created/updated with OCR")
         except Exception as e:
             print(f"Error creating skillset: {e}")
@@ -226,7 +230,7 @@ class AzureSearchService:
                 ]
             )
             
-            self.index_client.create_or_update_indexer(indexer)
+            self.indexer_client.create_or_update_indexer(indexer)
             print(f"Indexer '{self.indexer_name}' created/updated with OCR skillset")
         except Exception as e:
             print(f"Error creating indexer: {e}")
@@ -234,7 +238,7 @@ class AzureSearchService:
     async def run_indexer(self):
         """Manually trigger indexer to process new files"""
         try:
-            self.index_client.run_indexer(self.indexer_name)
+            self.indexer_client.run_indexer(self.indexer_name)
             print(f"Indexer '{self.indexer_name}' started")
             return True
         except Exception as e:
@@ -244,7 +248,7 @@ class AzureSearchService:
     async def get_indexer_status(self):
         """Get indexer execution status"""
         try:
-            status = self.index_client.get_indexer_status(self.indexer_name)
+            status = self.indexer_client.get_indexer_status(self.indexer_name)
             return {
                 "status": status.status,
                 "last_result": status.last_result.status if status.last_result else None,
