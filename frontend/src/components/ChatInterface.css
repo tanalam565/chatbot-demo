@@ -6,6 +6,98 @@
   overflow: hidden;
 }
 
+.upload-section {
+  padding: 12px 20px;
+  background: #f9f7fc;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.file-input {
+  display: none;
+}
+
+.upload-button {
+  padding: 8px 16px;
+  background: var(--purple);
+  color: white;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.upload-button:hover {
+  background: var(--purple-600);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+}
+
+.upload-button.uploading {
+  background: #9ca3af;
+  cursor: not-allowed;
+}
+
+.clear-button {
+  padding: 8px 16px;
+  background: #dc2626;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.clear-button:hover {
+  background: #b91c1c;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+}
+
+.clear-button:active {
+  transform: translateY(1px);
+}
+
+.uploaded-count {
+  font-size: 12px;
+  color: #5a5480;
+  font-weight: 500;
+}
+
+.system-message {
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  margin: 10px auto;
+  max-width: 80%;
+  text-align: center;
+  font-weight: 500;
+}
+
+.system-success {
+  background: #f0fdf4;
+  color: #166534;
+  border: 1px solid #bbf7d0;
+}
+
+.system-error {
+  background: #fef2f2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+}
+
 .messages-container {
   flex: 1;
   padding: 20px;
@@ -397,6 +489,24 @@
     padding: 3px 8px;
     margin-top: 6px;
   }
+
+  .upload-section {
+    padding: 10px 12px;
+  }
+
+  .upload-button {
+    padding: 7px 12px;
+    font-size: 12px;
+  }
+
+  .clear-button {
+    padding: 7px 12px;
+    font-size: 12px;
+  }
+
+  .uploaded-count {
+    font-size: 11px;
+  }
 }
 
 @media (max-width: 480px) {
@@ -498,6 +608,30 @@
     font-size: 9px;
     padding: 2px 6px;
     margin-top: 6px;
+  }
+
+  .upload-section {
+    padding: 8px 8px;
+    gap: 8px;
+  }
+
+  .upload-button {
+    padding: 6px 10px;
+    font-size: 11px;
+  }
+
+  .clear-button {
+    padding: 6px 10px;
+    font-size: 11px;
+  }
+
+  .uploaded-count {
+    font-size: 10px;
+  }
+
+  .system-message {
+    font-size: 12px;
+    padding: 8px 12px;
   }
 }
 
