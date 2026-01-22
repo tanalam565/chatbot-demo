@@ -38,7 +38,7 @@ function ChatInterface() {
                 'X-API-Key': process.env.REACT_APP_CHATBOT_API_KEY || ''
               },
               body: JSON.stringify({ session_id: sessionId }),
-              keepalive: true // Important for cleanup during page unload
+              keepalive: true
             }
           );
         } catch (error) {
@@ -47,7 +47,6 @@ function ChatInterface() {
       }
     };
 
-    // Cleanup on page close/refresh
     const handleBeforeUnload = () => {
       if (uploadedFiles.length > 0) {
         cleanupSession();
@@ -56,7 +55,6 @@ function ChatInterface() {
 
     window.addEventListener('beforeunload', handleBeforeUnload);
 
-    // Cleanup on component unmount
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
       cleanupSession();
@@ -83,7 +81,7 @@ function ChatInterface() {
       for (const file of files) {
         const formData = new FormData();
         formData.append('file', file);
-        formData.append('session_id', sessionId); // Always include session_id
+        formData.append('session_id', sessionId);
 
         const response = await fetch(
           `${process.env.REACT_APP_API_URL}/upload`,
@@ -113,7 +111,6 @@ function ChatInterface() {
 
       setUploadedFiles(prev => [...prev, ...uploadResults.filter(r => r.success)]);
 
-      // Add system message about upload
       const successCount = uploadResults.filter(r => r.success).length;
       if (successCount > 0) {
         const systemMessage = {
@@ -295,7 +292,7 @@ function ChatInterface() {
                           <span className="citation-filename">{source.filename}</span>
                           {source.score && (
                             <span className="citation-score">
-                              (Relevance: {(source.score * 100).toFixed(0)}%)
+                              (Relevance: {Math.min(100, Math.round(source.score * 10))}%)
                             </span>
                           )}
                         </li>

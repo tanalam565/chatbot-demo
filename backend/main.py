@@ -62,33 +62,44 @@ async def chat(request: ChatRequest, authenticated: bool = Depends(verify_api_ke
         print(f"Chat request - session_id: {request.session_id}")
         print(f"Available sessions: {list(session_documents.keys())}")
         
-        # 1. Get session documents (user uploads - in memory)
+        # Check if query needs document search
+        casual_queries = [
+            "hi", "hello", "hey", "how are you", "good morning", "good afternoon",
+            "good evening", "thanks", "thank you", "bye", "goodbye"
+        ]
+        
+        query_lower = request.message.lower().strip()
+        is_casual = any(casual in query_lower for casual in casual_queries) and len(query_lower.split()) <= 5
+        
+        # 1. Get session documents (user uploads)
         session_context = []
         if request.session_id and request.session_id in session_documents:
             session_context = [
                 {
                     "content": doc["content"],
                     "filename": doc["filename"],
-                    "score": 1.0  # High score for user-uploaded docs
+                    "score": 1.0
                 }
                 for doc in session_documents[request.session_id]
             ]
             print(f"Found {len(session_context)} session documents")
+        
+        # 2. Search indexed documents only if needed
+        indexed_results = []
+        if not is_casual:
+            indexed_results = await search_service.search(request.message)
+            print(f"Found {len(indexed_results)} indexed documents")
         else:
-            print(f"No session documents found for session_id: {request.session_id}")
+            print(f"Casual query detected, skipping document search")
         
-        # 2. Search indexed documents (company docs from blob storage)
-        indexed_results = await search_service.search(request.message)
-        print(f"Found {len(indexed_results)} indexed documents")
-        
-        # 3. Combine both sources (prioritize user uploads)
+        # 3. Combine sources
         all_context = session_context + indexed_results
         print(f"Total context documents: {len(all_context)}")
         
-        # 4. Generate response with LLM
+        # 4. Generate response
         response = await llm_service.generate_response(
             query=request.message,
-            context=all_context[:5],  # Top 5 results
+            context=all_context[:5] if all_context else [],
             session_id=request.session_id
         )
         
