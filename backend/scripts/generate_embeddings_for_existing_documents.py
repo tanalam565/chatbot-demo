@@ -1,4 +1,4 @@
-# backend/scripts/generate_embeddings_for_existing_documents.py - FIXED VERSION
+# backend/scripts/generate_embeddings_for_existing_documents.py - FULL UPDATED CODE
 
 import asyncio
 from azure.search.documents import SearchClient
@@ -10,14 +10,45 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import config
 from services.embedding_service import EmbeddingService
 
+# backend/scripts/generate_embeddings_for_existing_documents.py
+# Update extract_filename function:
+
+def extract_filename(result_dict):
+    """Extract filename - handle both parent docs and child chunks"""
+    
+    # Try title FIRST
+    title = result_dict.get("title")
+    if title and title.strip():
+        return title
+    
+    # Try filepath
+    filepath = result_dict.get("filepath")
+    if filepath and filepath.strip():
+        return filepath.split("/")[-1] if "/" in filepath else filepath
+    
+    # Extract from parent_id (for chunks)
+    parent_id = result_dict.get("parent_id")
+    if parent_id and parent_id.strip():
+        try:
+            import urllib.parse
+            # Parse URL from parent_id
+            parsed = urllib.parse.urlparse(parent_id)
+            path = parsed.path
+            if '/' in path:
+                filename = path.split('/')[-1]
+                filename = urllib.parse.unquote(filename)
+                if filename:
+                    return filename  # ✅ Return any filename, not just specific extensions
+        except:
+            pass
+    
+    return "Unknown Document"
+
 async def generate_embeddings_for_all_documents():
-    """
-    Generate embeddings for all documents in the search index
-    """
+    """Generate embeddings for all documents in the search index"""
     
     print("🚀 Starting embedding generation for existing documents...")
     
-    # Initialize services
     embedding_service = EmbeddingService()
     
     search_client = SearchClient(
@@ -27,11 +58,10 @@ async def generate_embeddings_for_all_documents():
     )
     
     try:
-        # Get all documents from index
+        # Get first document to identify key field
         print(f"Fetching documents from index: {config.AZURE_SEARCH_INDEX_NAME}")
         results = search_client.search(search_text="*", top=1000)
         
-        # First, let's identify the key field
         first_result = None
         for result in results:
             first_result = dict(result)
@@ -41,9 +71,9 @@ async def generate_embeddings_for_all_documents():
             print("❌ No documents found in index")
             return
         
-        # Find the key field (look for common key field names)
+        # Find key field
         key_field = None
-        possible_keys = ['metadata_storage_path', 'chunk_id', 'id', 'document_id', 'key']
+        possible_keys = ['chunk_id', 'metadata_storage_path', 'id', 'document_id', 'key']
         
         for possible_key in possible_keys:
             if possible_key in first_result:
@@ -55,12 +85,13 @@ async def generate_embeddings_for_all_documents():
             print(f"❌ Could not identify key field. Available fields: {list(first_result.keys())}")
             return
         
-        # Now process all documents
+        # Process all documents
         print(f"Re-fetching all documents...")
         results = search_client.search(search_text="*", top=1000)
         
         documents_to_update = []
         count = 0
+        unknown_count = 0
         
         for result in results:
             count += 1
@@ -81,11 +112,21 @@ async def generate_embeddings_for_all_documents():
                 print(f"  ⚠️  Skipping document {count} - no key value")
                 continue
             
+            # Extract filename
+            filename = extract_filename(result_dict)
+            
+            if filename == "Unknown Document":
+                unknown_count += 1
+            
             # Generate embedding
-            print(f"  Processing document {count}: {result_dict.get('metadata_storage_name', 'Unknown')[:50]}...")
+            print(f"  Processing document {count}: {filename[:60]}...")
             embedding = embedding_service.generate_embedding(str(content)[:32000])
             
-            # Prepare document update using the correct key field
+            # Verify embedding dimensions
+            if len(embedding) != config.EMBEDDING_DIMENSIONS:
+                print(f"    ⚠️  Warning: Expected {config.EMBEDDING_DIMENSIONS} dimensions, got {len(embedding)}")
+            
+            # Prepare document update
             doc_update = {
                 key_field: key_value,
                 "content_vector": embedding
@@ -125,8 +166,12 @@ async def generate_embeddings_for_all_documents():
                     except Exception as doc_error:
                         print(f"    ❌ Failed to upload doc: {doc_error}")
         
-        print(f"\n✅ Successfully processed {count} documents!")
-        print("🎉 Hybrid search is now fully operational!")
+        print(f"\n" + "="*60)
+        print(f"✅ Successfully processed {count} documents!")
+        if unknown_count > 0:
+            print(f"⚠️  {unknown_count} documents could not extract filename (but embeddings were generated)")
+        print(f"🎉 Hybrid search is now fully operational!")
+        print(f"="*60)
         
     except Exception as e:
         print(f"❌ Error generating embeddings: {e}")
