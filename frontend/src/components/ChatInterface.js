@@ -292,7 +292,7 @@ function ChatInterface() {
                           <span className="citation-filename">{source.filename}</span>
                           {source.score && (
                             <span className="citation-score">
-                              (Relevance: {Math.min(100, Math.round(source.score * 10))}%)
+                              (Relevance: {Math.min(100, Math.round(source.score * 100))}%)
                             </span>
                           )}
                         </li>

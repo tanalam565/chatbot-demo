@@ -1,8 +1,12 @@
+# backend/services/azure_search_service.py - FULL UPDATED CODE
+
 from azure.search.documents import SearchClient
 from azure.search.documents.indexes import SearchIndexerClient
+from azure.search.documents.models import VectorizedQuery
 from azure.core.credentials import AzureKeyCredential
 from typing import List, Dict
 import config
+from services.embedding_service import EmbeddingService
 
 class AzureSearchService:
     def __init__(self):
@@ -13,26 +17,47 @@ class AzureSearchService:
         
         self.credential = AzureKeyCredential(self.key)
         
+        # Search client for querying
         self.search_client = SearchClient(
             endpoint=self.endpoint,
             index_name=self.index_name,
             credential=self.credential
         )
         
+        # Indexer client for management
         self.indexer_client = SearchIndexerClient(
             endpoint=self.endpoint,
             credential=self.credential
         )
         
-        print(f"✓ Connected to existing index: {self.index_name}")
-    
+        # Embedding service for vector search
+        self.embedding_service = EmbeddingService()
+        
+        print(f"✓ Connected to index: {self.index_name} (Hybrid Search enabled)")
+
+# backend/services/azure_search_service.py - Update the search method
+
     async def search(self, query: str, top: int = config.MAX_SEARCH_RESULTS) -> List[Dict]:
-        """Search indexed documents"""
+        """
+        Perform hybrid search (keyword + vector) on indexed documents
+        """
         try:
-            print(f"Searching for: '{query}' in index '{self.index_name}'")
+            print(f"Hybrid search for: '{query}' in index '{self.index_name}'")
             
+            # Generate embedding for the query
+            query_embedding = self.embedding_service.generate_embedding(query)
+            
+            # Create vector query
+            vector_query = VectorizedQuery(
+                vector=query_embedding,
+                k_nearest_neighbors=top * 2,
+                fields="content_vector"
+            )
+            
+            # Perform hybrid search
             results = self.search_client.search(
                 search_text=query,
+                vector_queries=[vector_query],
                 top=top,
                 include_total_count=True
             )
@@ -46,113 +71,133 @@ class AzureSearchService:
                 if isinstance(content, list):
                     content = " ".join(str(item) for item in content)
                 
-                # Extract identifiers
-                filepath = result_dict.get("filepath", "")
-                title = result_dict.get("title", "")
-                chunk_id = result_dict.get("chunk_id", "")
-                parent_id = result_dict.get("parent_id", "")
-                url = result_dict.get("url", "")
+                # Extract filename - try ALL possible fields
+                filename = None
                 
-                # Get filename (priority order)
-                filename = "Unknown Document"
+                # Try metadata_storage_name first (most common)
+                if result_dict.get("metadata_storage_name"):
+                    filename = result_dict.get("metadata_storage_name")
                 
-                if filepath:
-                    filename = filepath.split('/')[-1] if '/' in filepath else filepath
-                    import urllib.parse
-                    filename = urllib.parse.unquote(filename)
-                elif title:
-                    filename = title
-                elif url:
-                    filename = url.split('/')[-1] if '/' in url else url
-                    import urllib.parse
-                    filename = urllib.parse.unquote(filename)
-                elif chunk_id:
-                    # Decode base64 chunk_id to get URL
+                # Try title
+                elif result_dict.get("title"):
+                    filename = result_dict.get("title")
+                
+                # Try filepath
+                elif result_dict.get("filepath"):
+                    filepath = result_dict.get("filepath")
+                    filename = filepath.split("/")[-1] if "/" in filepath else filepath
+                
+                # Try to decode chunk_id (base64 encoded URL)
+                elif result_dict.get("chunk_id"):
+                    chunk_id = result_dict.get("chunk_id")
                     try:
                         import base64
-                        import urllib.parse
-                        
-                        # Clean chunk_id - remove any trailing numbers/characters that break base64
-                        clean_chunk_id = chunk_id.rstrip('0123456789')
-                        
-                        # Add padding if needed for base64
-                        missing_padding = len(clean_chunk_id) % 4
-                        if missing_padding:
-                            clean_chunk_id += '=' * (4 - missing_padding)
-                        
-                        decoded = base64.b64decode(clean_chunk_id).decode('utf-8')
-                        
-                        # Extract filename from decoded URL
+                        decoded = base64.b64decode(chunk_id).decode('utf-8', errors='ignore')
+                        # Extract filename from URL in chunk_id
                         if '/' in decoded:
-                            filename = decoded.split('/')[-1]
-                            # Remove any trailing characters after .pdf
-                            if '.pdf' in filename:
-                                filename = filename.split('.pdf')[0] + '.pdf'
-                            # URL decode
-                            filename = urllib.parse.unquote(filename)
-                    except Exception as e:
-                        print(f"  ⚠️  Could not decode filename from chunk_id: {e}")
-                        filename = "Unknown Document"
-                elif parent_id:
-                    filename = f"Document (ID: {parent_id})"
+                            parts = decoded.split('/')
+                            for part in reversed(parts):
+                                if any(ext in part.lower() for ext in ['.pdf', '.png', '.jpg', '.jpeg', '.docx', '.txt']):
+                                    # URL decode the filename
+                                    import urllib.parse
+                                    filename = urllib.parse.unquote(part)
+                                    break
+                    except:
+                        pass
+                
+                # If still no filename, use "Unknown Document"
+                if not filename:
+                    filename = "Unknown Document"
+                
+                # Get hybrid search score
+                score = result_dict.get("@search.score", 0)
+                
+                # Get reranker score if available (better)
+                reranker_score = result_dict.get("@search.reranker_score")
+                if reranker_score:
+                    score = reranker_score
+                
+                if content:
+                    search_results.append({
+                        "content": str(content)[:5000],
+                        "filename": filename,
+                        "score": score,
+                        "source_type": "company"
+                    })
+                    print(f"  ✓ Found: {filename} (score: {score:.2f})")
+            
+            print(f"✓ Hybrid search returned {len(search_results)} results")
+            return search_results
+            
+        except Exception as e:
+            print(f"❌ Hybrid search error: {e}")
+            import traceback
+            traceback.print_exc()
+            return await self._fallback_keyword_search(query, top)
+    
+    async def _fallback_keyword_search(self, query: str, top: int) -> List[Dict]:
+        """
+        Fallback to keyword-only search if hybrid search fails
+        """
+        try:
+            results = self.search_client.search(
+                search_text=query,
+                top=top,
+                include_total_count=True
+            )
+            
+            search_results = []
+            for result in results:
+                result_dict = dict(result)
+                content = result_dict.get("content", "")
+                if isinstance(content, list):
+                    content = " ".join(str(item) for item in content)
+                
+                filename = (
+                    result_dict.get("metadata_storage_name") or
+                    result_dict.get("title") or
+                    "Unknown Document"
+                )
                 
                 score = result_dict.get("@search.score", 0)
                 
                 if content:
-                    print(f"  ✓ Found: {filename} (score: {score:.2f}, {len(str(content))} chars)")
                     search_results.append({
                         "content": str(content)[:5000],
                         "filename": filename,
-                        "score": score
+                        "score": score,
+                        "source_type": "company"
                     })
             
-            print(f"✓ Total search results: {len(search_results)}")
+            print(f"✓ Keyword search returned {len(search_results)} results")
             return search_results
             
         except Exception as e:
-            print(f"❌ Search error: {e}")
-            import traceback
-            traceback.print_exc()
+            print(f"❌ Fallback search error: {e}")
             return []
     
-    async def run_indexer(self):
-        """Manually trigger existing indexer"""
+    async def get_indexer_status(self):
+        """Get status of the Azure Search indexer"""
         try:
-            print(f"Triggering indexer: {self.indexer_name}")
+            status = self.indexer_client.get_indexer_status(self.indexer_name)
+            return {
+                "name": status.name,
+                "status": status.status,
+                "last_result": {
+                    "status": status.last_result.status if status.last_result else None,
+                    "error_message": status.last_result.error_message if status.last_result else None
+                }
+            }
+        except Exception as e:
+            print(f"Error getting indexer status: {e}")
+            return {"error": str(e)}
+    
+    async def run_indexer(self):
+        """Manually trigger the indexer to process new documents"""
+        try:
             self.indexer_client.run_indexer(self.indexer_name)
-            print(f"✓ Indexer '{self.indexer_name}' started")
+            print(f"✓ Indexer '{self.indexer_name}' triggered successfully")
             return True
         except Exception as e:
             print(f"❌ Error running indexer: {e}")
             return False
-    
-    async def get_indexer_status(self):
-        """Get indexer execution status"""
-        try:
-            status = self.indexer_client.get_indexer_status(self.indexer_name)
-            
-            result = {
-                "status": status.status,
-                "last_result": status.last_result.status if status.last_result else None,
-                "execution_history": []
-            }
-            
-            if status.execution_history:
-                for exec in status.execution_history[:5]:
-                    result["execution_history"].append({
-                        "status": exec.status,
-                        "error_message": exec.error_message,
-                        "start_time": exec.start_time.isoformat() if exec.start_time else None,
-                        "end_time": exec.end_time.isoformat() if exec.end_time else None
-                    })
-            
-            return result
-            
-        except Exception as e:
-            print(f"❌ Error getting indexer status: {e}")
-            return {
-                "status": "error",
-                "last_result": None,
-                "execution_history": [],
-                "error": str(e)
-            }
