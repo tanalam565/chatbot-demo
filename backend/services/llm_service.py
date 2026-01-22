@@ -1,3 +1,5 @@
+# llm_service.py - Full Updated Code
+
 from typing import List, Dict, Optional
 from openai import AzureOpenAI
 import uuid
@@ -14,13 +16,12 @@ class LLMService:
         )
         self.model = config.AZURE_OPENAI_DEPLOYMENT_NAME
     
-    def _build_system_prompt(self) -> str:
-        return """You are an AI assistant for Yottareal property management software, helping leasing office employees and property managers retrieve information from company documents.
+    def _build_system_prompt(self, has_uploads: bool = False, is_comparison: bool = False) -> str:
+        base_prompt = """You are an AI assistant for YottaReal property management software, helping leasing agents, property managers, and district managers retrieve information.
 
 Your role:
-- Answer questions based ONLY on the provided context from property management documents
+- Answer questions based ONLY on the provided context from documents
 - Be concise and professional
-- When referencing information from a document, naturally mention the source (e.g., "According to the Move-Out Policy..." or "As stated in the Team Member Handbook...")
 - If information is not in the provided context, clearly state that you don't have that information
 - Focus on practical, actionable information
 
@@ -32,28 +33,77 @@ Guidelines:
 - Include relevant policy numbers or section references when available
 - For ambiguous queries, ask clarifying questions
 - Always ground your answers in the provided documents"""
-    
-    def _build_prompt(self, query: str, context: List[Dict]) -> str:
-        context_text = "\n\n".join([
-            f"[Source: {doc['filename']}]\n{doc['content']}"
-            for doc in context
-        ])
-        
-        prompt = f"""Based on the following context from property management documents, answer the user's question.
 
-Context:
+        if has_uploads and is_comparison:
+            base_prompt += """
+
+COMPARISON MODE:
+You have access to BOTH uploaded documents AND company policy documents.
+- When comparing, explicitly state differences and compliance status
+- Format: "Your uploaded document [states X]. According to company policy [Y], this [complies/does not comply] because [reason]."
+- Be specific about which document each piece of information comes from
+- If documents conflict, clearly state the discrepancy"""
+
+        elif has_uploads:
+            base_prompt += """
+
+SOURCE ATTRIBUTION:
+- When referencing UPLOADED documents, say "According to your uploaded document..." or "Your [document name] shows..."
+- When referencing COMPANY documents (policies, handbooks), say "According to [policy/handbook name]..." or "Company policy states..."
+- Be clear about which source each piece of information comes from"""
+
+        else:
+            base_prompt += """
+
+SOURCE ATTRIBUTION:
+- When referencing information, naturally mention the source (e.g., "According to the Move-Out Policy..." or "As stated in the Team Member Handbook...")"""
+
+        return base_prompt
+    
+    def _build_prompt(self, query: str, context: List[Dict], has_uploads: bool = False) -> str:
+        # Separate uploaded vs company documents
+        uploaded_docs = [doc for doc in context if doc.get("source_type") == "uploaded"]
+        company_docs = [doc for doc in context if doc.get("source_type") == "company"]
+        
+        context_text = ""
+        
+        # Add uploaded documents first (higher priority)
+        if uploaded_docs:
+            context_text += "=== UPLOADED DOCUMENTS (User's Files) ===\n"
+            for i, doc in enumerate(uploaded_docs, 1):
+                context_text += f"\n[Uploaded Document {i}: {doc['filename']}]\n"
+                context_text += f"{doc['content'][:3000]}\n"  # Limit to 3000 chars per doc
+                if len(doc['content']) > 3000:
+                    context_text += "... (content truncated)\n"
+        
+        # Add company documents
+        if company_docs:
+            if uploaded_docs:
+                context_text += "\n" + "="*60 + "\n\n"
+            context_text += "=== COMPANY DOCUMENTS (Policies, Handbooks, Procedures) ===\n"
+            for i, doc in enumerate(company_docs, 1):
+                context_text += f"\n[Company Document {i}: {doc['filename']}]\n"
+                context_text += f"{doc['content'][:3000]}\n"  # Limit to 3000 chars per doc
+                if len(doc['content']) > 3000:
+                    context_text += "... (content truncated)\n"
+        
+        prompt = f"""Context from documents:
+
 {context_text}
 
-Question: {query}
+User question: {query}
 
-Answer:"""
+Answer (be specific about sources):"""
+        
         return prompt
     
     async def generate_response(
         self, 
         query: str, 
         context: List[Dict],
-        session_id: Optional[str] = None
+        session_id: Optional[str] = None,
+        has_uploads: bool = False,
+        is_comparison: bool = False
     ) -> Dict:
         if not session_id:
             session_id = str(uuid.uuid4())
@@ -61,8 +111,8 @@ Answer:"""
         if session_id not in self.conversation_history:
             self.conversation_history[session_id] = []
         
-        system_prompt = self._build_system_prompt()
-        user_prompt = self._build_prompt(query, context)
+        system_prompt = self._build_system_prompt(has_uploads, is_comparison)
+        user_prompt = self._build_prompt(query, context, has_uploads)
         
         try:
             response = await self._generate_azure_openai(
@@ -77,30 +127,58 @@ Answer:"""
                 "response": response
             })
             
-            # Extract and deduplicate source documents
+            # Build sources with type attribution
+            sources = []
             seen_files = set()
-            unique_sources = []
             
+            # Add uploaded docs first
             for doc in context:
-                filename = doc["filename"]
-                if filename not in seen_files:
-                    seen_files.add(filename)
-                    unique_sources.append({
-                        "filename": filename,
-                        "score": doc.get("score", 0)
-                    })
+                if doc.get("source_type") == "uploaded":
+                    filename = doc["filename"]
+                    if filename not in seen_files:
+                        seen_files.add(filename)
+                        sources.append({
+                            "filename": f"📤 {filename}",
+                            "score": doc.get("score", 10.0),
+                            "type": "uploaded"
+                        })
             
-            # Sort by relevance score (highest first)
-            unique_sources.sort(key=lambda x: x["score"], reverse=True)
+            # Then add company docs
+            for doc in context:
+                if doc.get("source_type") == "company":
+                    filename = doc["filename"]
+                    if filename not in seen_files:
+                        seen_files.add(filename)
+                        sources.append({
+                            "filename": f"📁 {filename}",
+                            "score": doc.get("score", 0),
+                            "type": "company"
+                        })
+            
+            # If no source_type (fallback for old data)
+            for doc in context:
+                if "source_type" not in doc:
+                    filename = doc["filename"]
+                    if filename not in seen_files:
+                        seen_files.add(filename)
+                        sources.append({
+                            "filename": filename,
+                            "score": doc.get("score", 0),
+                            "type": "unknown"
+                        })
+            
+            print(f"Generated response with {len(sources)} sources")
             
             return {
                 "answer": response,
-                "sources": unique_sources,
+                "sources": sources,
                 "session_id": session_id
             }
         
         except Exception as e:
-            print(f"LLM generation error: {e}")
+            print(f"❌ LLM generation error: {e}")
+            import traceback
+            traceback.print_exc()
             return {
                 "answer": "I apologize, but I encountered an error processing your request.",
                 "sources": [],
@@ -115,7 +193,7 @@ Answer:"""
     ) -> str:
         messages = [{"role": "system", "content": system_prompt}]
         
-        # Add conversation history
+        # Add conversation history (last 3 exchanges)
         for msg in self.conversation_history[session_id][-3:]:
             messages.append({"role": "user", "content": msg["query"]})
             messages.append({"role": "assistant", "content": msg["response"]})

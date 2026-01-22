@@ -1,9 +1,12 @@
+/* ChatInterface.css - Full Updated Code */
+
 .chat-container {
   flex: 1;
   display: flex;
   flex-direction: column;
   height: 100%;
   overflow: hidden;
+  position: relative;
 }
 
 .upload-section {
@@ -103,6 +106,7 @@
   padding: 20px;
   background: linear-gradient(180deg, #fdfcff 0%, #faf8fd 100%);
   overflow-y: auto;
+  min-height: 0; /* Critical for flex overflow */
 }
 
 .welcome-message {
@@ -357,6 +361,9 @@
   padding: 14px 18px;
   border-top: 1px solid var(--border);
   background: var(--bg);
+  flex-shrink: 0;
+  position: relative;
+  z-index: 10;
 }
 
 .message-input {
@@ -433,6 +440,7 @@
 @media (max-width: 768px) {
   .messages-container {
     padding: 16px 12px;
+    padding-bottom: 20px; /* Extra space before input */
   }
 
   .welcome-message {
@@ -463,6 +471,7 @@
   .input-form {
     padding: 12px 12px;
     gap: 8px;
+    background: white; /* Ensure solid background */
   }
 
   .message-input {
@@ -512,6 +521,7 @@
 @media (max-width: 480px) {
   .messages-container {
     padding: 12px 8px;
+    padding-bottom: 16px; /* Extra space before input on small screens */
   }
 
   .welcome-message {
@@ -555,6 +565,7 @@
   .input-form {
     padding: 10px 8px;
     gap: 6px;
+    background: white; /* Solid background on mobile */
   }
 
   .message-input {
@@ -651,6 +662,11 @@
   .send-button:active:not(:disabled) {
     transform: scale(0.98);
   }
+
+  /* Prevent zoom on input focus for iOS */
+  .message-input {
+    font-size: 16px !important;
+  }
 }
 
 /* Landscape mobile orientation */
@@ -661,13 +677,17 @@
 
   .messages-container {
     padding: 12px;
-  }
-
-  .site-header {
-    padding: 10px 16px;
+    padding-bottom: 16px;
   }
 
   .input-form {
     padding: 10px 12px;
+  }
+}
+
+/* iOS Safari specific fixes */
+@supports (-webkit-touch-callout: none) {
+  .input-form {
+    padding-bottom: env(safe-area-inset-bottom, 10px);
   }
 }

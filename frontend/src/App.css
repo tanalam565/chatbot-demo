@@ -1,3 +1,5 @@
+/* App.css - Full Updated Code */
+
 :root {
   --purple: #a840e0;
   --purple-600: #922ccc;
@@ -50,8 +52,7 @@ body {
   border-bottom: 1px solid var(--border);
   padding: 16px 20px;
   flex-shrink: 0;
-  position: sticky;
-  top: 0;
+  position: relative;
   z-index: 100;
 }
 
@@ -84,6 +85,7 @@ body {
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  min-height: 0; /* Important for flex overflow */
 }
 
 /* Footer */
@@ -92,8 +94,7 @@ body {
   border-top: 1px solid var(--border);
   background: var(--bg);
   flex-shrink: 0;
-  position: sticky;
-  bottom: 0;
+  position: relative;
   z-index: 100;
   text-align: center;
 }
@@ -143,5 +144,25 @@ body {
   .wordmark .tagline {
     font-size: 8px;
     letter-spacing: 0.3em;
+  }
+  
+  .site-footer {
+    padding: 10px 12px 14px;
+  }
+  
+  .copyright {
+    font-size: 10px;
+    margin-top: 6px;
+  }
+}
+
+/* iOS Safari specific fixes */
+@supports (-webkit-touch-callout: none) {
+  .app {
+    height: -webkit-fill-available;
+  }
+  
+  html, body, #root {
+    height: -webkit-fill-available;
   }
 }

@@ -1,3 +1,5 @@
+# main.py - Full Updated Code with Better Upload Detection
+
 from fastapi import FastAPI, HTTPException, Security, Depends, UploadFile, File, Form
 from fastapi.security import APIKeyHeader
 from fastapi.middleware.cors import CORSMiddleware
@@ -59,48 +61,172 @@ class CleanupRequest(BaseModel):
 @app.post("/api/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest, authenticated: bool = Depends(verify_api_key)):
     try:
+        print(f"\n{'='*60}")
         print(f"Chat request - session_id: {request.session_id}")
+        print(f"Query: {request.message}")
         print(f"Available sessions: {list(session_documents.keys())}")
         
-        # Check if query needs document search
+        query_lower = request.message.lower().strip()
+        
+        # ===== CHECK IF USER HAS UPLOADED DOCUMENTS =====
+        has_uploaded_docs = bool(
+            request.session_id and request.session_id in session_documents
+        )
+        print(f"Has uploaded docs: {has_uploaded_docs}")
+        
+        # ===== INTENT DETECTION =====
+        
+        # 1. Casual queries (no search needed)
         casual_queries = [
             "hi", "hello", "hey", "how are you", "good morning", "good afternoon",
             "good evening", "thanks", "thank you", "bye", "goodbye"
         ]
-        
-        query_lower = request.message.lower().strip()
         is_casual = any(casual in query_lower for casual in casual_queries) and len(query_lower.split()) <= 5
         
-        # 1. Get session documents (user uploads)
+        # 2. Upload-only queries (only use uploaded docs)
+        upload_only_patterns = [
+            # Direct upload references
+            "upload", "uploaded", "the upload",
+            "describe the upload", "explain the upload", "summarize the upload",
+            "about the upload", "uploaded document", "uploaded file",
+            
+            # "This" references (when user has uploads, likely referring to them)
+            "what is this", "what's this", "describe this", "explain this",
+            "summarize this", "read this", "about this",
+            "this document", "this file", "the document", "the file",
+            
+            # Possessive references
+            "my document", "my file", "document i uploaded", "file i uploaded",
+            "the document i", "the file i",
+            
+            # Question patterns about uploads
+            "what is the uploaded", "what's the uploaded", "what does this",
+            "what's in this", "what is in this", "tell me about this"
+        ]
+        
+        is_upload_only = (
+            has_uploaded_docs and 
+            any(pattern in query_lower for pattern in upload_only_patterns)
+        )
+        
+        # 3. Comparison queries (needs both uploaded + company docs)
+        comparison_patterns = [
+            "compare", "compliant", "comply", "compliance", "match", "matches",
+            "differ", "difference", "vs", "versus", "according to our",
+            "does this follow", "is this correct", "does this meet",
+            "against our", "with our policy", "standard agreement",
+            "does it comply", "is it compliant", "meets our", "follows our"
+        ]
+        is_comparison = any(pattern in query_lower for pattern in comparison_patterns)
+        
+        # 4. Policy/handbook queries (company docs only)
+        policy_patterns = [
+            "our policy", "our policies", "our handbook", "our procedure",
+            "company policy", "how to", "how do i", "what are the steps",
+            "what is the process", "standard procedure", "disaster management",
+            "marketing", "close a deal", "record video", "laws", "regulations",
+            "what are adara", "what is adara", "adara's policies", "adara policies"
+        ]
+        is_policy_only = (
+            any(pattern in query_lower for pattern in policy_patterns) and 
+            not is_comparison and
+            not is_upload_only
+        )
+        
+        print(f"Intent: casual={is_casual}, upload_only={is_upload_only}, comparison={is_comparison}, policy_only={is_policy_only}")
+        
+        # ===== GET SESSION DOCUMENTS (User Uploads) =====
         session_context = []
         if request.session_id and request.session_id in session_documents:
             session_context = [
                 {
                     "content": doc["content"],
                     "filename": doc["filename"],
-                    "score": 1.0
+                    "score": 10.0,  # Shows as 100% in frontend
+                    "source_type": "uploaded"
                 }
                 for doc in session_documents[request.session_id]
             ]
-            print(f"Found {len(session_context)} session documents")
+            print(f"Found {len(session_context)} uploaded documents")
         
-        # 2. Search indexed documents only if needed
+        # ===== SEARCH INDEXED DOCUMENTS (Company Docs) =====
         indexed_results = []
-        if not is_casual:
+        
+        # Skip search for casual queries
+        if is_casual:
+            print("Casual query detected - skipping all document search")
+        
+        # Skip search for upload-only queries if user has uploads
+        elif is_upload_only and session_context:
+            print("Upload-only query with uploaded docs - skipping company search")
+        
+        # Search company docs for policy queries
+        elif is_policy_only:
+            print("Policy query - searching company docs only")
             indexed_results = await search_service.search(request.message)
-            print(f"Found {len(indexed_results)} indexed documents")
+        
+        # Search company docs for comparison queries
+        elif is_comparison:
+            print("Comparison query - searching company docs to compare with uploads")
+            indexed_results = await search_service.search(request.message)
+        
+        # Search company docs if no uploads exist
+        elif not session_context:
+            print("No uploads - searching company docs")
+            indexed_results = await search_service.search(request.message)
+        
+        # Default: search if unclear intent
         else:
-            print(f"Casual query detected, skipping document search")
+            print("Default: searching company docs")
+            indexed_results = await search_service.search(request.message)
+            
+        # Mark company docs
+        for doc in indexed_results:
+            doc["source_type"] = "company"
         
-        # 3. Combine sources
-        all_context = session_context + indexed_results
-        print(f"Total context documents: {len(all_context)}")
+        print(f"Found {len(indexed_results)} company documents")
         
-        # 4. Generate response
+        # ===== SMART CONTEXT SELECTION =====
+        if is_upload_only and session_context:
+            # Only uploaded docs
+            all_context = session_context
+            print(f"Context: Using {len(all_context)} uploaded docs ONLY")
+            
+        elif is_policy_only and not is_comparison:
+            # Only company docs
+            all_context = indexed_results
+            print(f"Context: Using {len(all_context)} company docs ONLY")
+            
+        elif is_comparison and session_context and indexed_results:
+            # Both sources for comparison - filter company docs to high relevance only
+            filtered_company = [doc for doc in indexed_results if doc["score"] > 2.5]
+            all_context = session_context + filtered_company[:3]  # Top 3 company docs
+            print(f"Context: Using {len(session_context)} uploaded + {len(filtered_company[:3])} company docs (comparison mode)")
+            
+        elif session_context and indexed_results:
+            # Both sources available - filter low relevance company docs
+            filtered_company = [doc for doc in indexed_results if doc["score"] > 3.0]
+            if filtered_company:
+                all_context = session_context + filtered_company[:2]  # Top 2 company docs
+                print(f"Context: Using {len(session_context)} uploaded + {len(filtered_company[:2])} high-relevance company docs")
+            else:
+                all_context = session_context
+                print(f"Context: Using {len(session_context)} uploaded docs only (no relevant company docs)")
+        else:
+            # Default: use whatever is available
+            all_context = session_context + indexed_results
+            print(f"Context: Using all {len(all_context)} docs (default)")
+        
+        # ===== GENERATE RESPONSE =====
+        print(f"Sending {len(all_context[:5])} documents to LLM")
+        print(f"{'='*60}\n")
+        
         response = await llm_service.generate_response(
             query=request.message,
             context=all_context[:5] if all_context else [],
-            session_id=request.session_id
+            session_id=request.session_id,
+            has_uploads=bool(session_context),
+            is_comparison=is_comparison
         )
         
         return ChatResponse(
@@ -110,7 +236,9 @@ async def chat(request: ChatRequest, authenticated: bool = Depends(verify_api_ke
         )
         
     except Exception as e:
-        print(f"Chat error: {e}")
+        print(f"❌ Chat error: {e}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/upload")
@@ -128,7 +256,10 @@ async def upload_document(
         if not session_id:
             session_id = str(uuid.uuid4())
         
-        print(f"Upload - session_id: {session_id}, filename: {file.filename}")
+        print(f"\n{'='*60}")
+        print(f"Upload - session_id: {session_id}")
+        print(f"Filename: {file.filename}")
+        print(f"Content-Type: {file.content_type}")
         
         # Validate file type
         allowed_types = [
@@ -160,13 +291,13 @@ async def upload_document(
         )
         
         if not extraction_result['success']:
-            print(f"Extraction failed: {extraction_result.get('error')}")
+            print(f"❌ Extraction failed: {extraction_result.get('error')}")
             raise HTTPException(
                 status_code=500,
                 detail=f"Failed to extract text: {extraction_result.get('error', 'Unknown error')}"
             )
         
-        print(f"Extracted {len(extraction_result['text'])} characters from {extraction_result['page_count']} pages")
+        print(f"✅ Extracted {len(extraction_result['text'])} characters from {extraction_result['page_count']} pages")
         
         # Store in memory for this session
         if session_id not in session_documents:
@@ -178,8 +309,10 @@ async def upload_document(
             "page_count": extraction_result['page_count']
         })
         
-        print(f"Stored document in session {session_id}. Total docs in session: {len(session_documents[session_id])}")
+        print(f"✅ Stored document in session {session_id}")
+        print(f"Total docs in session: {len(session_documents[session_id])}")
         print(f"Total active sessions: {len(session_documents)}")
+        print(f"{'='*60}\n")
         
         return {
             "message": "File uploaded and ready for immediate queries!",
@@ -193,7 +326,9 @@ async def upload_document(
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Error in upload_document: {e}")
+        print(f"❌ Error in upload_document: {e}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/cleanup-session")
@@ -207,6 +342,7 @@ async def cleanup_session(
     """
     try:
         session_id = request.session_id
+        print(f"\n{'='*60}")
         print(f"Cleanup request for session: {session_id}")
         
         if not session_id:
@@ -216,8 +352,9 @@ async def cleanup_session(
         if session_id in session_documents:
             files_count = len(session_documents[session_id])
             del session_documents[session_id]
-            print(f"Deleted {files_count} documents from session {session_id}")
+            print(f"✅ Deleted {files_count} documents from session {session_id}")
             print(f"Remaining active sessions: {len(session_documents)}")
+            print(f"{'='*60}\n")
             
             return {
                 "message": "Session cleaned up successfully",
@@ -225,7 +362,8 @@ async def cleanup_session(
                 "files_deleted": files_count
             }
         
-        print(f"No session found for {session_id}")
+        print(f"⚠️  No session found for {session_id}")
+        print(f"{'='*60}\n")
         return {
             "message": "No session found",
             "session_id": session_id,
@@ -235,7 +373,7 @@ async def cleanup_session(
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Error in cleanup_session: {e}")
+        print(f"❌ Error in cleanup_session: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/indexer/status")
