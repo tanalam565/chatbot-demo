@@ -1,4 +1,4 @@
-# backend/main.py - FULL CODE WITH LLM INTENT CLASSIFICATION
+# backend/main.py - DEFINITIVE FIX
 
 from fastapi import FastAPI, HTTPException, Security, Depends, UploadFile, File, Form
 from fastapi.security import APIKeyHeader
@@ -11,7 +11,6 @@ import uuid
 from services.azure_search_service import AzureSearchService
 from services.llm_service import LLMService
 from services.document_intelligence_service import DocumentIntelligenceService
-from services.intent_service import IntentService
 import config
 
 app = FastAPI(title="Property Management Chatbot API")
@@ -31,7 +30,6 @@ app.add_middleware(
 search_service = AzureSearchService()
 llm_service = LLMService()
 doc_intelligence_service = DocumentIntelligenceService()
-intent_service = IntentService()
 
 # In-memory storage for session documents (temporary user uploads)
 session_documents: Dict[str, list] = {}
@@ -64,28 +62,13 @@ class CleanupRequest(BaseModel):
 async def chat(request: ChatRequest, authenticated: bool = Depends(verify_api_key)):
     try:
         print(f"\n{'='*60}")
-        print(f"Chat request - session_id: {request.session_id}")
+        print(f"📨 Chat Request")
+        print(f"Session ID: {request.session_id}")
         print(f"Query: {request.message}")
-        print(f"Available sessions: {list(session_documents.keys())}")
+        print(f"Active sessions: {list(session_documents.keys())}")
+        print(f"{'='*60}")
         
-        # ===== CHECK IF USER HAS UPLOADED DOCUMENTS =====
-        has_uploaded_docs = bool(
-            request.session_id and request.session_id in session_documents
-        )
-        print(f"Has uploaded docs: {has_uploaded_docs}")
-        
-        # ===== LLM-BASED INTENT CLASSIFICATION =====
-        intent_result = await intent_service.classify_intent(
-            request.message, 
-            has_uploaded_docs
-        )
-        
-        intent = intent_result['intent']
-        confidence = intent_result['confidence']
-        
-        print(f"Intent: {intent} (confidence: {confidence:.2f})")
-        
-        # ===== GET SESSION DOCUMENTS (User Uploads) =====
+        # ===== STEP 1: GET ALL UPLOADED DOCUMENTS FOR THIS SESSION =====
         session_context = []
         if request.session_id and request.session_id in session_documents:
             session_context = [
@@ -96,72 +79,80 @@ async def chat(request: ChatRequest, authenticated: bool = Depends(verify_api_ke
                 }
                 for doc in session_documents[request.session_id]
             ]
-            print(f"Found {len(session_context)} uploaded documents")
+            print(f"\n📤 UPLOADED DOCUMENTS IN SESSION: {len(session_context)}")
+            for i, doc in enumerate(session_context, 1):
+                content_preview = doc['content'][:100].replace('\n', ' ')
+                print(f"  {i}. {doc['filename']}")
+                print(f"     Content preview: {content_preview}...")
+                print(f"     Total chars: {len(doc['content'])}")
+        else:
+            print(f"\n📤 No uploaded documents in this session")
         
-        # ===== SEARCH INDEXED DOCUMENTS (Company Docs) =====
+        # ===== STEP 2: CHECK IF CASUAL CHAT =====
+        casual_patterns = [
+            'hi', 'hello', 'hey', 'how are you', 'thanks', 
+            'thank you', 'bye', 'goodbye', 'good morning', 'good evening'
+        ]
+        query_lower = request.message.lower().strip()
+        is_casual = query_lower in casual_patterns or len(query_lower.split()) <= 2 and any(p in query_lower for p in casual_patterns)
+        
+        print(f"\n💬 Query Type: {'Casual chat' if is_casual else 'Document query'}")
+        
+        # ===== STEP 3: SEARCH COMPANY DOCUMENTS =====
         indexed_results = []
-        
-        if intent == "casual":
-            print("Casual query - skipping all document search")
-        
-        elif intent == "upload_only" and session_context:
-            print("Upload-only query - using uploaded docs only")
-        
-        elif intent == "policy_only":
-            print("Policy query - searching company docs")
+        if not is_casual:
+            print(f"\n🔍 Searching company documents...")
             indexed_results = await search_service.search(request.message)
-        
-        elif intent == "comparison":
-            print("Comparison query - searching company docs to compare with uploads")
-            indexed_results = await search_service.search(request.message)
-        
-        elif not session_context:
-            print("No uploads - searching company docs")
-            indexed_results = await search_service.search(request.message)
-        
+            
+            for doc in indexed_results:
+                doc["source_type"] = "company"
+            
+            print(f"📁 Found {len(indexed_results)} company documents")
+            for i, doc in enumerate(indexed_results, 1):
+                print(f"  {i}. {doc['filename']}")
         else:
-            print("Default - searching company docs")
-            indexed_results = await search_service.search(request.message)
+            print(f"\n🔍 Skipping document search (casual chat)")
         
-        # Mark company docs
-        for doc in indexed_results:
-            doc["source_type"] = "company"
+        # ===== STEP 4: BUILD CONTEXT FOR LLM (CRITICAL!) =====
+        all_context = []
         
-        print(f"Found {len(indexed_results)} company documents")
-        
-        # ===== SMART CONTEXT SELECTION =====
-        if intent == "upload_only" and session_context:
-            all_context = session_context
-            print(f"Context: Using {len(all_context)} uploaded docs ONLY")
+        if is_casual:
+            # Casual chat - no documents needed
+            all_context = []
+            print(f"\n📋 CONTEXT FOR LLM: Empty (casual chat)")
             
-        elif intent == "policy_only" and not intent == "comparison":
-            all_context = indexed_results
-            print(f"Context: Using {len(all_context)} company docs ONLY")
-            
-        elif intent == "comparison" and session_context and indexed_results:
-            # For comparison, use all uploaded docs + top company docs
+        elif session_context:
+            # HAS UPLOADS: Send ALL uploads + top company docs
             all_context = session_context + indexed_results[:3]
-            print(f"Context: Using {len(session_context)} uploaded + {len(indexed_results[:3])} company docs (comparison mode)")
+            print(f"\n📋 CONTEXT FOR LLM: {len(all_context)} documents")
+            print(f"   - ALL {len(session_context)} uploaded documents")
+            print(f"   - Top {len(indexed_results[:3])} company documents")
             
-        elif session_context and indexed_results:
-            # Both available - use uploads + top company docs
-            all_context = session_context + indexed_results[:2]
-            print(f"Context: Using {len(session_context)} uploaded + {len(indexed_results[:2])} company docs")
         else:
-            # Default: use whatever is available
-            all_context = session_context + indexed_results
-            print(f"Context: Using all {len(all_context)} docs (default)")
+            # NO UPLOADS: Send top company docs only
+            all_context = indexed_results[:5]
+            print(f"\n📋 CONTEXT FOR LLM: {len(all_context)} company documents")
         
-        # ===== GENERATE RESPONSE =====
-        print(f"Sending {len(all_context[:5])} documents to LLM")
+        # ===== STEP 5: LOG WHAT'S BEING SENT =====
+        print(f"\n📤 SENDING TO LLM ({len(all_context)} documents):")
+        for i, doc in enumerate(all_context, 1):
+            doc_type = doc.get('source_type', 'unknown')
+            icon = "📤" if doc_type == "uploaded" else "📁"
+            print(f"  {i}. {icon} [{doc_type}] {doc['filename']}")
+            print(f"      Content length: {len(doc.get('content', ''))} chars")
+        
+        if not all_context and not is_casual:
+            print(f"  ⚠️  WARNING: No documents in context!")
+        
         print(f"{'='*60}\n")
         
+        # ===== STEP 6: GENERATE RESPONSE =====
         response = await llm_service.generate_response(
             query=request.message,
-            context=all_context[:5] if all_context else [],
+            context=all_context,
             session_id=request.session_id,
             has_uploads=bool(session_context),
-            is_comparison=(intent == "comparison")
+            is_comparison=False
         )
         
         return ChatResponse(
@@ -182,17 +173,14 @@ async def upload_document(
     session_id: Optional[str] = Form(None),
     authenticated: bool = Depends(verify_api_key)
 ):
-    """
-    Upload a document, extract text with Document Intelligence, 
-    store in memory for immediate access
-    """
+    """Upload a document and store in memory for the session"""
     try:
-        # Generate session ID if not provided
         if not session_id:
             session_id = str(uuid.uuid4())
         
         print(f"\n{'='*60}")
-        print(f"Upload - session_id: {session_id}")
+        print(f"📤 UPLOAD REQUEST")
+        print(f"Session ID: {session_id}")
         print(f"Filename: {file.filename}")
         print(f"Content-Type: {file.content_type}")
         
@@ -211,7 +199,7 @@ async def upload_document(
         if file.content_type not in allowed_types:
             raise HTTPException(
                 status_code=400,
-                detail=f"File type {file.content_type} not supported. Supported types: PDF, Images (JPG, PNG, TIFF, BMP), DOCX, TXT"
+                detail=f"File type {file.content_type} not supported"
             )
         
         # Read file content
@@ -244,13 +232,15 @@ async def upload_document(
             "page_count": extraction_result['page_count']
         })
         
-        print(f"✅ Stored document in session {session_id}")
-        print(f"Total docs in session: {len(session_documents[session_id])}")
-        print(f"Total active sessions: {len(session_documents)}")
+        print(f"✅ Stored in session: {session_id}")
+        print(f"📊 Session now has {len(session_documents[session_id])} documents:")
+        for i, doc in enumerate(session_documents[session_id], 1):
+            print(f"   {i}. {doc['filename']} ({len(doc['content'])} chars)")
+        print(f"📊 Total active sessions: {len(session_documents)}")
         print(f"{'='*60}\n")
         
         return {
-            "message": "File uploaded and ready for immediate queries!",
+            "message": "File uploaded and ready for queries!",
             "filename": file.filename,
             "session_id": session_id,
             "pages_extracted": extraction_result['page_count'],
@@ -271,24 +261,21 @@ async def cleanup_session(
     request: CleanupRequest,
     authenticated: bool = Depends(verify_api_key)
 ):
-    """
-    Clean up session documents from memory.
-    Called when user closes the chat or session ends.
-    """
+    """Clean up session documents from memory"""
     try:
         session_id = request.session_id
         print(f"\n{'='*60}")
-        print(f"Cleanup request for session: {session_id}")
+        print(f"🗑️  CLEANUP REQUEST")
+        print(f"Session ID: {session_id}")
         
         if not session_id:
             raise HTTPException(status_code=400, detail="session_id is required")
         
-        # Remove from memory
         if session_id in session_documents:
             files_count = len(session_documents[session_id])
             del session_documents[session_id]
-            print(f"✅ Deleted {files_count} documents from session {session_id}")
-            print(f"Remaining active sessions: {len(session_documents)}")
+            print(f"✅ Deleted {files_count} documents from session")
+            print(f"📊 Remaining active sessions: {len(session_documents)}")
             print(f"{'='*60}\n")
             
             return {
@@ -297,7 +284,7 @@ async def cleanup_session(
                 "files_deleted": files_count
             }
         
-        print(f"⚠️  No session found for {session_id}")
+        print(f"⚠️  Session not found")
         print(f"{'='*60}\n")
         return {
             "message": "No session found",
@@ -313,7 +300,7 @@ async def cleanup_session(
 
 @app.get("/api/indexer/status")
 async def get_indexer_status(authenticated: bool = Depends(verify_api_key)):
-    """Get status of Azure Search indexer (for company documents)"""
+    """Get status of Azure Search indexer"""
     try:
         status = await search_service.get_indexer_status()
         return status
@@ -322,7 +309,7 @@ async def get_indexer_status(authenticated: bool = Depends(verify_api_key)):
 
 @app.post("/api/indexer/run")
 async def run_indexer(authenticated: bool = Depends(verify_api_key)):
-    """Manually trigger Azure Search indexer (for company documents)"""
+    """Manually trigger Azure Search indexer"""
     try:
         success = await search_service.run_indexer()
         if success:
@@ -334,7 +321,7 @@ async def run_indexer(authenticated: bool = Depends(verify_api_key)):
 
 @app.get("/api/health")
 async def health_check():
-    """Public health check endpoint - no authentication required"""
+    """Public health check endpoint"""
     return {"status": "healthy"}
 
 if __name__ == "__main__":

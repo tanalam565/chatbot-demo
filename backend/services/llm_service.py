@@ -1,4 +1,4 @@
-# backend/services/llm_service.py - UPDATED (No Scores)
+# backend/services/llm_service.py - FINAL FIX
 
 from typing import List, Dict, Optional
 from openai import AzureOpenAI
@@ -16,7 +16,7 @@ class LLMService:
         )
         self.model = config.AZURE_OPENAI_DEPLOYMENT_NAME
     
-    def _build_system_prompt(self, has_uploads: bool = False, is_comparison: bool = False) -> str:
+    def _build_system_prompt(self, has_uploads: bool = False) -> str:
         base_prompt = """You are an AI assistant for YottaReal property management software, helping leasing agents, property managers, and district managers retrieve information.
 
 Your role:
@@ -34,24 +34,14 @@ Guidelines:
 - For ambiguous queries, ask clarifying questions
 - Always ground your answers in the provided documents"""
 
-        if has_uploads and is_comparison:
-            base_prompt += """
-
-COMPARISON MODE:
-You have access to BOTH uploaded documents AND company policy documents.
-- When comparing, explicitly state differences and compliance status
-- Format: "Your uploaded document [states X]. According to company policy [Y], this [complies/does not comply] because [reason]."
-- Be specific about which document each piece of information comes from
-- If documents conflict, clearly state the discrepancy"""
-
-        elif has_uploads:
+        if has_uploads:
             base_prompt += """
 
 SOURCE ATTRIBUTION:
-- When referencing UPLOADED documents, say "According to your uploaded document..." or "Your [document name] shows..."
+- When referencing UPLOADED documents, say "According to your uploaded document..." or "In [document name]..."
 - When referencing COMPANY documents (policies, handbooks), say "According to [policy/handbook name]..." or "Company policy states..."
-- Be clear about which source each piece of information comes from"""
-
+- Be clear about which source each piece of information comes from
+- If there are multiple uploaded documents and the query is ambiguous, describe ALL of them"""
         else:
             base_prompt += """
 
@@ -67,25 +57,28 @@ SOURCE ATTRIBUTION:
         
         context_text = ""
         
-        # Add uploaded documents first (higher priority)
+        # CRITICAL: Send FULL uploaded documents (NO truncation!)
         if uploaded_docs:
             context_text += "=== UPLOADED DOCUMENTS (User's Files) ===\n"
             for i, doc in enumerate(uploaded_docs, 1):
                 context_text += f"\n[Uploaded Document {i}: {doc['filename']}]\n"
-                context_text += f"{doc['content'][:3000]}\n"
-                if len(doc['content']) > 3000:
-                    context_text += "... (content truncated)\n"
+                # SEND FULL CONTENT - NO TRUNCATION!
+                context_text += f"{doc['content']}\n"
+                context_text += f"(End of Uploaded Document {i})\n"
         
-        # Add company documents
+        # Company documents - can be more generous with limit
         if company_docs:
             if uploaded_docs:
                 context_text += "\n" + "="*60 + "\n\n"
             context_text += "=== COMPANY DOCUMENTS (Policies, Handbooks, Procedures) ===\n"
             for i, doc in enumerate(company_docs, 1):
                 context_text += f"\n[Company Document {i}: {doc['filename']}]\n"
-                context_text += f"{doc['content'][:3000]}\n"
-                if len(doc['content']) > 3000:
-                    context_text += "... (content truncated)\n"
+                # Allow up to 10,000 chars per company doc (still plenty of room)
+                content = doc['content'][:10000]
+                context_text += f"{content}\n"
+                if len(doc['content']) > 10000:
+                    context_text += f"... (content truncated, original length: {len(doc['content'])} chars)\n"
+                context_text += f"(End of Company Document {i})\n"
         
         prompt = f"""Context from documents:
 
@@ -111,8 +104,23 @@ Answer (be specific about sources):"""
         if session_id not in self.conversation_history:
             self.conversation_history[session_id] = []
         
-        system_prompt = self._build_system_prompt(has_uploads, is_comparison)
+        system_prompt = self._build_system_prompt(has_uploads)
         user_prompt = self._build_prompt(query, context, has_uploads)
+        
+        # Calculate actual prompt size
+        total_chars = len(user_prompt)
+        estimated_tokens = total_chars // 4
+        
+        # Calculate uploaded vs company content
+        uploaded_chars = sum(len(doc['content']) for doc in context if doc.get('source_type') == 'uploaded')
+        company_chars = sum(min(len(doc['content']), 10000) for doc in context if doc.get('source_type') == 'company')
+        
+        print(f"📊 Prompt Statistics:")
+        print(f"   Total prompt: {total_chars:,} chars (~{estimated_tokens:,} tokens)")
+        print(f"   Uploaded content: {uploaded_chars:,} chars (FULL, no truncation)")
+        print(f"   Company content: {company_chars:,} chars")
+        print(f"   Context window available: ~128,000 tokens")
+        print(f"   Usage: {(estimated_tokens/128000)*100:.1f}%")
         
         try:
             response = await self._generate_azure_openai(
@@ -164,7 +172,7 @@ Answer (be specific about sources):"""
                             "type": "unknown"
                         })
             
-            print(f"Generated response with {len(sources)} sources")
+            print(f"✅ Generated response with {len(sources)} sources")
             
             return {
                 "answer": response,
@@ -201,7 +209,7 @@ Answer (be specific about sources):"""
             model=self.model,
             messages=messages,
             temperature=0.3,
-            max_tokens=1000
+            max_tokens=2000  # Increased for longer responses
         )
         
         return response.choices[0].message.content

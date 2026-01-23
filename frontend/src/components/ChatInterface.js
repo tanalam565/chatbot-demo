@@ -1,4 +1,4 @@
-// frontend/src/components/ChatInterface.js - UPDATED (No Scores)
+// frontend/src/components/ChatInterface.js - FIXED CLEANUP
 
 import React, { useState, useRef, useEffect } from 'react';
 import { sendMessage } from '../services/api';
@@ -17,6 +17,11 @@ function ChatInterface() {
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
 
+  // Log session ID for debugging
+  useEffect(() => {
+    console.log('🔑 Session ID:', sessionId);
+  }, [sessionId]);
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
@@ -25,9 +30,11 @@ function ChatInterface() {
     scrollToBottom();
   }, [messages]);
 
+  // FIXED: Only cleanup on component unmount (no dependencies!)
   useEffect(() => {
     const cleanupSession = async () => {
       if (uploadedFiles.length > 0 && sessionId) {
+        console.log('🗑️ Cleaning up session on unmount:', sessionId);
         try {
           await fetch(
             `${process.env.REACT_APP_API_URL}/cleanup-session`,
@@ -47,7 +54,8 @@ function ChatInterface() {
       }
     };
 
-    const handleBeforeUnload = () => {
+    // Only cleanup on window close (not on refresh)
+    const handleBeforeUnload = (e) => {
       if (uploadedFiles.length > 0) {
         cleanupSession();
       }
@@ -55,11 +63,13 @@ function ChatInterface() {
 
     window.addEventListener('beforeunload', handleBeforeUnload);
 
+    // Cleanup ONLY when component unmounts (page close)
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
+      // Only cleanup if truly unmounting (not on every render)
       cleanupSession();
     };
-  }, [uploadedFiles.length, sessionId]);
+  }, []); // ← FIXED: Empty dependency array!
 
   const handleCopy = (text, index) => {
     navigator.clipboard.writeText(text).then(() => {
@@ -77,11 +87,15 @@ function ChatInterface() {
     setUploading(true);
     const uploadResults = [];
 
+    console.log('📤 Uploading files with session ID:', sessionId);
+
     try {
       for (const file of files) {
         const formData = new FormData();
         formData.append('file', file);
         formData.append('session_id', sessionId);
+
+        console.log('📤 Uploading:', file.name, 'with session:', sessionId);
 
         const response = await fetch(
           `${process.env.REACT_APP_API_URL}/upload`,
@@ -96,6 +110,8 @@ function ChatInterface() {
 
         if (response.ok) {
           const result = await response.json();
+          console.log('✅ Upload successful. Backend returned session:', result.session_id);
+          
           uploadResults.push({
             name: file.name,
             success: true,
@@ -115,7 +131,7 @@ function ChatInterface() {
       if (successCount > 0) {
         const systemMessage = {
           role: 'system',
-          content: `✓ Uploaded ${successCount} document(s). You can now ask questions about them! (Files will be automatically deleted when you close this chat)`,
+          content: `✓ Uploaded ${successCount} document(s). You can now ask questions about them!`,
           timestamp: new Date()
         };
         setMessages(prev => [...prev, systemMessage]);
@@ -144,6 +160,8 @@ function ChatInterface() {
     if (!window.confirm(`Delete ${uploadedFiles.length} uploaded document(s)?`)) {
       return;
     }
+
+    console.log('🗑️ User manually clearing uploads');
 
     try {
       const response = await fetch(
@@ -190,8 +208,25 @@ function ChatInterface() {
     setInput('');
     setLoading(true);
 
+    console.log('💬 Sending chat with session ID:', sessionId);
+    console.log('📊 Uploaded files count:', uploadedFiles.length);
+
     try {
       const response = await sendMessage(input, sessionId);
+      
+      console.log('✅ Chat response received');
+      console.log('🔑 Backend returned session ID:', response.session_id);
+      console.log('📚 Sources count:', response.sources?.length || 0);
+      
+      // Don't update session ID after initial set
+      if (!sessionId || sessionId === 'temp') {
+        console.log('⚠️ Updating session ID from backend');
+        setSessionId(response.session_id);
+      } else if (response.session_id !== sessionId) {
+        console.warn('⚠️ Backend returned different session ID!');
+        console.warn('   Frontend:', sessionId);
+        console.warn('   Backend:', response.session_id);
+      }
       
       const botMessage = {
         role: 'assistant',
@@ -201,8 +236,8 @@ function ChatInterface() {
       };
       
       setMessages(prev => [...prev, botMessage]);
-      setSessionId(response.session_id);
     } catch (error) {
+      console.error('Chat error:', error);
       const errorMessage = {
         role: 'assistant',
         content: 'Sorry, I encountered an error. Please try again.',
