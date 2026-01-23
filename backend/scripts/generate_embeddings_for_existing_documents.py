@@ -1,4 +1,4 @@
-# backend/scripts/generate_embeddings_for_existing_documents.py
+# backend/scripts/generate_embeddings_for_existing_documents.py - UPDATED FOR YOUR SETUP
 
 import asyncio
 from azure.search.documents import SearchClient
@@ -13,6 +13,7 @@ from services.embedding_service import EmbeddingService
 
 
 def _as_clean_str(v):
+    """Convert value to clean string"""
     if v is None:
         return ""
     if isinstance(v, str):
@@ -21,7 +22,7 @@ def _as_clean_str(v):
 
 
 def _filename_from_urlish(urlish: str) -> str:
-    """Extract filename from a URL or URL-like string."""
+    """Extract filename from a URL or URL-like string"""
     try:
         parsed = urllib.parse.urlparse(urlish)
         path = parsed.path or ""
@@ -33,26 +34,31 @@ def _filename_from_urlish(urlish: str) -> str:
 
 
 def extract_filename(result_dict: dict) -> str:
-    """Extract filename - handle both parent docs and child chunks"""
+    """Extract filename from search result - tries multiple fields"""
 
-    # 1) title
+    # 1) title (most reliable - comes from metadata_storage_name)
     title = _as_clean_str(result_dict.get("title"))
     if title:
         return title
 
-    # 2) filepath
+    # 2) metadata_storage_name (original filename)
+    storage_name = _as_clean_str(result_dict.get("metadata_storage_name"))
+    if storage_name:
+        return storage_name
+
+    # 3) filepath
     filepath = _as_clean_str(result_dict.get("filepath"))
     if filepath:
         return filepath.split("/")[-1] if "/" in filepath else filepath
 
-    # 3) url (your docs have this; this is the best fallback)
+    # 4) url (blob storage path)
     url = _as_clean_str(result_dict.get("url"))
     if url:
         name = _filename_from_urlish(url)
         if name:
             return name
 
-    # 4) parent_id
+    # 5) parent_id (fallback)
     parent_id = _as_clean_str(result_dict.get("parent_id"))
     if parent_id:
         name = _filename_from_urlish(parent_id)
@@ -65,7 +71,9 @@ def extract_filename(result_dict: dict) -> str:
 async def generate_embeddings_for_all_documents():
     """Generate embeddings for all documents in the search index"""
 
-    print("🚀 Starting embedding generation for existing documents...")
+    print("=" * 70)
+    print("🚀 Starting Embedding Generation for All Documents")
+    print("=" * 70)
 
     embedding_service = EmbeddingService()
 
@@ -76,9 +84,9 @@ async def generate_embeddings_for_all_documents():
     )
 
     try:
-        print(f"Fetching documents from index: {config.AZURE_SEARCH_INDEX_NAME}")
+        print(f"\n📊 Fetching documents from index: {config.AZURE_SEARCH_INDEX_NAME}")
 
-        # Pull one doc to infer key field
+        # Fetch one document to identify the key field
         results = search_client.search(search_text="*", top=1)
 
         first_result = None
@@ -88,9 +96,11 @@ async def generate_embeddings_for_all_documents():
 
         if not first_result:
             print("❌ No documents found in index")
+            print("\nℹ️  Make sure your indexer has run successfully:")
+            print("   python scripts/debug_index_contents.py")
             return
 
-        # Identify key field
+        # Identify the key field
         key_field = None
         possible_keys = ["chunk_id", "id", "document_id", "key", "metadata_storage_path"]
 
@@ -101,35 +111,89 @@ async def generate_embeddings_for_all_documents():
                 break
 
         if not key_field:
-            print(f"❌ Could not identify key field. Available fields: {list(first_result.keys())}")
+            print(f"❌ Could not identify key field")
+            print(f"Available fields: {list(first_result.keys())}")
             return
 
-        # Fetch all docs (top=1000 is OK for your current 61 docs; if it grows, we should paginate via skip)
-        print("Re-fetching all documents...")
-        results = search_client.search(search_text="*", top=1000)
+        # Show available content fields
+        print(f"\n📝 Available content fields:")
+        for field in ["content", "merged_content"]:
+            if field in first_result:
+                content_val = first_result.get(field, "")
+                if content_val:
+                    print(f"   ✓ {field}: {len(str(content_val))} characters")
+                else:
+                    print(f"   ⚠️  {field}: empty")
 
+        # Fetch all documents (paginated for future scaling)
+        print(f"\n📥 Fetching all documents (with pagination)...")
+        
+        all_documents = []
+        skip = 0
+        batch_size = 1000
+        
+        while True:
+            results = search_client.search(
+                search_text="*",
+                top=batch_size,
+                skip=skip,
+                select=[
+                    key_field, 
+                    "content", 
+                    "merged_content",
+                    "title", 
+                    "filepath", 
+                    "url", 
+                    "parent_id",
+                    "metadata_storage_name"
+                ]
+            )
+            
+            batch = list(results)
+            if not batch:
+                break
+                
+            all_documents.extend(batch)
+            skip += batch_size
+            
+            if len(batch) < batch_size:
+                break
+
+        print(f"✓ Total documents to process: {len(all_documents)}")
+
+        # Process documents and generate embeddings
         documents_to_update = []
         processed = 0
         skipped_no_content = 0
         skipped_no_key = 0
         unknown_count = 0
 
-        for result in results:
+        print(f"\n⚙️  Generating embeddings...")
+        print("-" * 70)
+
+        for result in all_documents:
             result_dict = dict(result)
 
-            # content
-            content = result_dict.get("content", "")
+            # Try merged_content first (has OCR + PDF text), fallback to content
+            content = result_dict.get("merged_content", "")
+            if not content:
+                content = result_dict.get("content", "")
+            
             if isinstance(content, list):
                 content = " ".join(_as_clean_str(x) for x in content)
 
             content = _as_clean_str(content)
+            
             if not content:
+                filename = extract_filename(result_dict)
+                print(f"  ⚠️  Skipping {filename}: No content found")
                 skipped_no_content += 1
                 continue
 
-            # key
+            # Get key value
             key_value = result_dict.get(key_field)
             if key_value is None or _as_clean_str(key_value) == "":
+                print(f"  ⚠️  Skipping document: No key value")
                 skipped_no_key += 1
                 continue
 
@@ -138,12 +202,17 @@ async def generate_embeddings_for_all_documents():
                 unknown_count += 1
 
             processed += 1
-            print(f"  Processing document {processed}: {filename[:80]}...")
+            
+            # Show progress
+            print(f"  [{processed}/{len(all_documents)}] Processing: {filename[:60]}...")
+            print(f"      Content length: {len(content)} chars")
 
+            # Generate embedding (truncate to 32k chars to avoid token limits)
             embedding = embedding_service.generate_embedding(content[:32000])
 
+            # Verify dimensions
             if len(embedding) != config.EMBEDDING_DIMENSIONS:
-                print(f"    ⚠️  Warning: Expected {config.EMBEDDING_DIMENSIONS} dims, got {len(embedding)}")
+                print(f"      ⚠️  Warning: Expected {config.EMBEDDING_DIMENSIONS} dims, got {len(embedding)}")
 
             doc_update = {
                 key_field: key_value,
@@ -151,51 +220,65 @@ async def generate_embeddings_for_all_documents():
             }
             documents_to_update.append(doc_update)
 
-            # Upload in batches of 10
+            # Upload in batches of 10 for stability
             if len(documents_to_update) >= 10:
-                print(f"  📤 Uploading batch of {len(documents_to_update)} embeddings...")
+                print(f"\n  📤 Uploading batch of {len(documents_to_update)} embeddings...")
                 try:
                     search_client.merge_or_upload_documents(documents=documents_to_update)
-                    print("  ✅ Batch uploaded successfully")
+                    print(f"  ✅ Batch uploaded successfully\n")
                 except Exception as batch_error:
                     print(f"  ❌ Batch upload error: {batch_error}")
-                    # fallback: one-by-one
+                    print(f"  ℹ️  Trying one-by-one upload...")
+                    # Fallback: upload one by one
                     for doc in documents_to_update:
                         try:
                             search_client.merge_or_upload_documents(documents=[doc])
                         except Exception as doc_error:
-                            print(f"    ❌ Failed to upload doc: {doc_error}")
+                            print(f"    ❌ Failed to upload document: {doc_error}")
                 documents_to_update = []
 
-        # Upload remaining
+        # Upload remaining documents
         if documents_to_update:
-            print(f"  📤 Uploading final batch of {len(documents_to_update)} embeddings...")
+            print(f"\n  📤 Uploading final batch of {len(documents_to_update)} embeddings...")
             try:
                 search_client.merge_or_upload_documents(documents=documents_to_update)
-                print("  ✅ Final batch uploaded successfully")
+                print(f"  ✅ Final batch uploaded successfully")
             except Exception as batch_error:
                 print(f"  ❌ Final batch upload error: {batch_error}")
+                print(f"  ℹ️  Trying one-by-one upload...")
                 for doc in documents_to_update:
                     try:
                         search_client.merge_or_upload_documents(documents=[doc])
                     except Exception as doc_error:
-                        print(f"    ❌ Failed to upload doc: {doc_error}")
+                        print(f"    ❌ Failed to upload document: {doc_error}")
 
-        print("\n" + "=" * 60)
-        print(f"✅ Successfully processed {processed} documents!")
+        # Summary
+        print("\n" + "=" * 70)
+        print("✅ EMBEDDING GENERATION COMPLETE!")
+        print("=" * 70)
+        print(f"📊 Summary:")
+        print(f"   ✓ Successfully processed: {processed} documents")
         if skipped_no_content:
-            print(f"ℹ️  Skipped {skipped_no_content} docs with no content")
+            print(f"   ⚠️  Skipped (no content): {skipped_no_content} documents")
         if skipped_no_key:
-            print(f"ℹ️  Skipped {skipped_no_key} docs with no key value")
+            print(f"   ⚠️  Skipped (no key): {skipped_no_key} documents")
         if unknown_count:
-            print(f"⚠️  {unknown_count} docs could not extract filename (but embeddings were generated)")
-        print("🎉 Hybrid search is now fully operational!")
-        print("=" * 60)
+            print(f"   ℹ️  Unknown filename: {unknown_count} documents (but embeddings generated)")
+        print(f"\n🎉 Hybrid search is now fully operational!")
+        print(f"   Model: {config.AZURE_OPENAI_EMBEDDING_MODEL}")
+        print(f"   Dimensions: {config.EMBEDDING_DIMENSIONS}")
+        print("=" * 70)
 
     except Exception as e:
-        print(f"❌ Error generating embeddings: {e}")
+        print(f"\n❌ Error generating embeddings: {e}")
         import traceback
         traceback.print_exc()
+        print("\nℹ️  Troubleshooting:")
+        print("   1. Check if indexer ran successfully:")
+        print("      python scripts/debug_index_contents.py")
+        print("   2. Verify documents are in index:")
+        print("      python scripts/list_docments.py")
+        print("   3. Check Azure OpenAI embedding service is accessible")
 
 
 if __name__ == "__main__":
