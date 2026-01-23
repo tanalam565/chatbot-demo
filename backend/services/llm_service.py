@@ -1,4 +1,4 @@
-# llm_service.py - Full Updated Code
+# backend/services/llm_service.py - UPDATED (No Scores)
 
 from typing import List, Dict, Optional
 from openai import AzureOpenAI
@@ -72,7 +72,7 @@ SOURCE ATTRIBUTION:
             context_text += "=== UPLOADED DOCUMENTS (User's Files) ===\n"
             for i, doc in enumerate(uploaded_docs, 1):
                 context_text += f"\n[Uploaded Document {i}: {doc['filename']}]\n"
-                context_text += f"{doc['content'][:3000]}\n"  # Limit to 3000 chars per doc
+                context_text += f"{doc['content'][:3000]}\n"
                 if len(doc['content']) > 3000:
                     context_text += "... (content truncated)\n"
         
@@ -83,7 +83,7 @@ SOURCE ATTRIBUTION:
             context_text += "=== COMPANY DOCUMENTS (Policies, Handbooks, Procedures) ===\n"
             for i, doc in enumerate(company_docs, 1):
                 context_text += f"\n[Company Document {i}: {doc['filename']}]\n"
-                context_text += f"{doc['content'][:3000]}\n"  # Limit to 3000 chars per doc
+                context_text += f"{doc['content'][:3000]}\n"
                 if len(doc['content']) > 3000:
                     context_text += "... (content truncated)\n"
         
@@ -127,7 +127,7 @@ Answer (be specific about sources):"""
                 "response": response
             })
             
-            # Build sources with type attribution
+            # Build sources WITHOUT scores
             sources = []
             seen_files = set()
             
@@ -139,7 +139,6 @@ Answer (be specific about sources):"""
                         seen_files.add(filename)
                         sources.append({
                             "filename": f"📤 {filename}",
-                            "score": doc.get("score", 10.0),
                             "type": "uploaded"
                         })
             
@@ -151,7 +150,6 @@ Answer (be specific about sources):"""
                         seen_files.add(filename)
                         sources.append({
                             "filename": f"📁 {filename}",
-                            "score": doc.get("score", 0),
                             "type": "company"
                         })
             
@@ -163,7 +161,6 @@ Answer (be specific about sources):"""
                         seen_files.add(filename)
                         sources.append({
                             "filename": filename,
-                            "score": doc.get("score", 0),
                             "type": "unknown"
                         })
             

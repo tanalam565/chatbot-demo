@@ -1,3 +1,5 @@
+// frontend/src/components/ChatInterface.js - UPDATED (No Scores)
+
 import React, { useState, useRef, useEffect } from 'react';
 import { sendMessage } from '../services/api';
 import './ChatInterface.css';
@@ -7,7 +9,6 @@ function ChatInterface() {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [sessionId, setSessionId] = useState(() => {
-    // Generate or retrieve session ID
     return `session-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
   });
   const [copiedIndex, setCopiedIndex] = useState(null);
@@ -24,7 +25,6 @@ function ChatInterface() {
     scrollToBottom();
   }, [messages]);
 
-  // Cleanup on component unmount or page close
   useEffect(() => {
     const cleanupSession = async () => {
       if (uploadedFiles.length > 0 && sessionId) {
@@ -283,18 +283,13 @@ function ChatInterface() {
                 {message.sources && message.sources.length > 0 && (
                   <div className="citations">
                     <div className="citations-header">
-                      <strong>Citations:</strong>
+                      <strong>Sources:</strong>
                     </div>
                     <ul className="citations-list">
                       {message.sources.map((source, idx) => (
                         <li key={idx} className="citation-item">
                           <span className="citation-number">[{idx + 1}]</span>
                           <span className="citation-filename">{source.filename}</span>
-                          {source.score && (
-                            <span className="citation-score">
-                              (Relevance: {Math.min(100, Math.round(source.score * 100))}%)
-                            </span>
-                          )}
                         </li>
                       ))}
                     </ul>

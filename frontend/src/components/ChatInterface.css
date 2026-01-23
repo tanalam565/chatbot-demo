@@ -1,4 +1,4 @@
-/* ChatInterface.css - Full Updated Code */
+/* frontend/src/components/ChatInterface.css - UPDATED (No Score Styles) */
 
 .chat-container {
   flex: 1;
@@ -106,7 +106,7 @@
   padding: 20px;
   background: linear-gradient(180deg, #fdfcff 0%, #faf8fd 100%);
   overflow-y: auto;
-  min-height: 0; /* Critical for flex overflow */
+  min-height: 0;
 }
 
 .welcome-message {
@@ -349,12 +349,6 @@
   word-break: break-word;
 }
 
-.citation-score {
-  font-size: 11px;
-  color: #7a6f91;
-  font-style: italic;
-}
-
 .input-form {
   display: flex;
   gap: 10px;
@@ -440,7 +434,7 @@
 @media (max-width: 768px) {
   .messages-container {
     padding: 16px 12px;
-    padding-bottom: 20px; /* Extra space before input */
+    padding-bottom: 20px;
   }
 
   .welcome-message {
@@ -471,12 +465,12 @@
   .input-form {
     padding: 12px 12px;
     gap: 8px;
-    background: white; /* Ensure solid background */
+    background: white;
   }
 
   .message-input {
     padding: 12px 14px;
-    font-size: 16px; /* Prevents iOS zoom on focus */
+    font-size: 16px;
   }
 
   .send-button {
@@ -521,7 +515,7 @@
 @media (max-width: 480px) {
   .messages-container {
     padding: 12px 8px;
-    padding-bottom: 16px; /* Extra space before input on small screens */
+    padding-bottom: 16px;
   }
 
   .welcome-message {
@@ -565,12 +559,12 @@
   .input-form {
     padding: 10px 8px;
     gap: 6px;
-    background: white; /* Solid background on mobile */
+    background: white;
   }
 
   .message-input {
     padding: 11px 12px;
-    font-size: 16px; /* Prevents iOS zoom */
+    font-size: 16px;
     border-radius: 10px;
   }
 
@@ -604,10 +598,6 @@
   }
 
   .citation-filename {
-    font-size: 10px;
-  }
-
-  .citation-score {
     font-size: 10px;
   }
 
@@ -646,30 +636,26 @@
   }
 }
 
-/* Touch device optimizations */
 @media (hover: none) and (pointer: coarse) {
   .send-button {
-    min-height: 44px; /* Minimum touch target size */
+    min-height: 44px;
   }
 
   .message-input {
     min-height: 44px;
-    -webkit-appearance: none; /* Remove iOS default styling */
+    -webkit-appearance: none;
     appearance: none;
   }
 
-  /* Improve tap feedback */
   .send-button:active:not(:disabled) {
     transform: scale(0.98);
   }
 
-  /* Prevent zoom on input focus for iOS */
   .message-input {
     font-size: 16px !important;
   }
 }
 
-/* Landscape mobile orientation */
 @media (max-width: 768px) and (orientation: landscape) {
   .welcome-message {
     padding: 2rem 1.5rem;
@@ -685,7 +671,6 @@
   }
 }
 
-/* iOS Safari specific fixes */
 @supports (-webkit-touch-callout: none) {
   .input-form {
     padding-bottom: env(safe-area-inset-bottom, 10px);

@@ -92,7 +92,6 @@ async def chat(request: ChatRequest, authenticated: bool = Depends(verify_api_ke
                 {
                     "content": doc["content"],
                     "filename": doc["filename"],
-                    "score": 10.0,  # Shows as 100% in frontend
                     "source_type": "uploaded"
                 }
                 for doc in session_documents[request.session_id]
@@ -132,30 +131,22 @@ async def chat(request: ChatRequest, authenticated: bool = Depends(verify_api_ke
         
         # ===== SMART CONTEXT SELECTION =====
         if intent == "upload_only" and session_context:
-            # Only uploaded docs
             all_context = session_context
             print(f"Context: Using {len(all_context)} uploaded docs ONLY")
             
         elif intent == "policy_only" and not intent == "comparison":
-            # Only company docs
             all_context = indexed_results
             print(f"Context: Using {len(all_context)} company docs ONLY")
             
         elif intent == "comparison" and session_context and indexed_results:
-            # Both sources for comparison - filter company docs to high relevance only
-            filtered_company = [doc for doc in indexed_results if doc["score"] > 2.5]
-            all_context = session_context + filtered_company[:3]  # Top 3 company docs
-            print(f"Context: Using {len(session_context)} uploaded + {len(filtered_company[:3])} company docs (comparison mode)")
+            # For comparison, use all uploaded docs + top company docs
+            all_context = session_context + indexed_results[:3]
+            print(f"Context: Using {len(session_context)} uploaded + {len(indexed_results[:3])} company docs (comparison mode)")
             
         elif session_context and indexed_results:
-            # Both sources available - filter low relevance company docs
-            filtered_company = [doc for doc in indexed_results if doc["score"] > 3.0]
-            if filtered_company:
-                all_context = session_context + filtered_company[:2]  # Top 2 company docs
-                print(f"Context: Using {len(session_context)} uploaded + {len(filtered_company[:2])} high-relevance company docs")
-            else:
-                all_context = session_context
-                print(f"Context: Using {len(session_context)} uploaded docs only (no relevant company docs)")
+            # Both available - use uploads + top company docs
+            all_context = session_context + indexed_results[:2]
+            print(f"Context: Using {len(session_context)} uploaded + {len(indexed_results[:2])} company docs")
         else:
             # Default: use whatever is available
             all_context = session_context + indexed_results

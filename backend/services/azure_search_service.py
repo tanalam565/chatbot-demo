@@ -1,4 +1,4 @@
-# backend/services/azure_search_service.py - COMPLETE CODE
+# backend/services/azure_search_service.py - UPDATED (No Scores)
 
 from azure.search.documents import SearchClient
 from azure.search.documents.indexes import SearchIndexerClient
@@ -97,19 +97,13 @@ class AzureSearchService:
                     print(f"  ⚠️  Skipping chunk with no filename")
                     continue
                 
-                score = result_dict.get("@search.score", 0)
-                reranker_score = result_dict.get("@search.reranker_score")
-                if reranker_score:
-                    score = reranker_score
-                
                 if content:
                     search_results.append({
                         "content": str(content)[:5000],
                         "filename": filename,
-                        "score": score,
                         "source_type": "company"
                     })
-                    print(f"  ✓ Found: {filename} (score: {score:.2f})")
+                    print(f"  ✓ Found: {filename}")
                 
                 if len(search_results) >= top:
                     break
@@ -145,13 +139,10 @@ class AzureSearchService:
                 if filename == "Unknown Document":
                     continue
                 
-                score = result_dict.get("@search.score", 0)
-                
                 if content:
                     search_results.append({
                         "content": str(content)[:5000],
                         "filename": filename,
-                        "score": score,
                         "source_type": "company"
                     })
                 
