@@ -1,4 +1,4 @@
-# backend/services/llm_service.py - FIXED with Citation Tracking
+# backend/services/llm_service.py - FIXED BULLET FORMATTING
 
 from typing import List, Dict, Optional
 from openai import AzureOpenAI
@@ -22,9 +22,36 @@ class LLMService:
 
 Your role:
 - Answer questions based ONLY on the provided context from documents
-- Be concise and professional
+- Be thorough and detailed in your responses
 - If information is not in the provided context, clearly state that you don't have that information
 - Focus on practical, actionable information
+
+FORMATTING REQUIREMENTS (CRITICAL):
+- Do NOT use ** for bold text or any Markdown formatting
+- DO use bullet points with this EXACT format:
+  
+  Main topic:
+  - Bullet point 1 with details
+  - Bullet point 2 with details
+  - Bullet point 3 with details
+
+- Each bullet point should be on its OWN LINE
+- Add a blank line between major sections
+- Use dashes (-) for bullet points
+- Keep each bullet point to 2-3 sentences maximum
+- Start each major section with a clear heading followed by a colon
+
+Example of CORRECT formatting:
+
+Customer Service Policy:
+- All communications must be acknowledged within 24 hours, whether written, electronic, or by phone
+- Team members should maintain professional and courteous communication at all times
+- Specific guidelines are provided for telephone interactions and greetings
+
+Resident Relations:
+- Residents can submit grievances through the Resident Relations email
+- Issues should first be addressed with onsite staff before escalation
+- All complaints must be documented in writing for proper tracking
 
 CRITICAL CITATION REQUIREMENT:
 When you reference information from a document, you MUST cite it using this format:
@@ -32,15 +59,15 @@ When you reference information from a document, you MUST cite it using this form
 
 Example: "According to the Move-Out Policy [DOC_1], residents must provide 60 days notice."
 
-IMPORTANT: Do NOT use Markdown formatting (no **, -, #, etc.) unless explicitly required.
-
 Guidelines:
-- Prioritize accuracy over completeness
-- Use bullet points for procedures or lists when appropriate
+- Prioritize accuracy and completeness
+- Use bullet points on separate lines for easy reading
 - Include relevant policy numbers or section references when available
+- Provide detailed explanations with context (2-3 sentences per bullet)
 - For ambiguous queries, ask clarifying questions
 - Always ground your answers in the provided documents
-- ALWAYS include [DOC_N] citations when referencing specific information"""
+- ALWAYS include [DOC_N] citations when referencing specific information
+- Make responses thorough and informative"""
 
         if has_uploads:
             base_prompt += """
@@ -49,12 +76,14 @@ SOURCE ATTRIBUTION:
 - When referencing UPLOADED documents, say "According to your uploaded document [DOC_N]..." or "In [document name] [DOC_N]..."
 - When referencing COMPANY documents (policies, handbooks), say "According to [policy/handbook name] [DOC_N]..." or "Company policy [DOC_N] states..."
 - Be clear about which source each piece of information comes from
-- If there are multiple uploaded documents and the query is ambiguous, describe ALL of them with their [DOC_N] citations"""
+- If there are multiple uploaded documents and the query is ambiguous, describe ALL of them with their [DOC_N] citations
+- Provide comprehensive details from the uploaded documents in bullet format"""
         else:
             base_prompt += """
 
 SOURCE ATTRIBUTION:
-- When referencing information, naturally mention the source with [DOC_N] citation (e.g., "According to the Move-Out Policy [DOC_1]..." or "As stated in the Team Member Handbook [DOC_3]...")"""
+- When referencing information, naturally mention the source with [DOC_N] citation (e.g., "According to the Move-Out Policy [DOC_1]..." or "As stated in the Team Member Handbook [DOC_3]...")
+- Provide comprehensive information from the cited documents in bullet format"""
 
         return base_prompt
     
@@ -105,7 +134,7 @@ SOURCE ATTRIBUTION:
 
 User question: {query}
 
-Answer (remember to cite sources with [DOC_N] format):"""
+Answer (use bullet points on separate lines with [DOC_N] citations):"""
         
         return prompt, doc_mapping
     
@@ -130,11 +159,15 @@ Answer (remember to cite sources with [DOC_N] format):"""
         return sources
     
     def _clean_response(self, response_text: str) -> str:
-        """Remove [DOC_N] citations from response for cleaner display"""
+        """Remove [DOC_N] citations and clean formatting"""
         # Replace [DOC_N] with nothing
         cleaned = re.sub(r'\s*\[DOC_\d+\]\s*', ' ', response_text)
-        # Clean up multiple spaces
-        cleaned = re.sub(r'\s+', ' ', cleaned)
+        # Remove any ** markdown
+        cleaned = re.sub(r'\*\*', '', cleaned)
+        # Clean up multiple spaces but preserve line breaks
+        lines = cleaned.split('\n')
+        cleaned_lines = [' '.join(line.split()) for line in lines]
+        cleaned = '\n'.join(cleaned_lines)
         return cleaned.strip()
     
     async def generate_response(
@@ -230,6 +263,8 @@ Answer (remember to cite sources with [DOC_N] format):"""
                 "session_id": session_id
             }
     
+    # backend/services/llm_service.py - Send ALL conversation history
+
     async def _generate_azure_openai(
         self, 
         system_prompt: str, 
@@ -238,18 +273,23 @@ Answer (remember to cite sources with [DOC_N] format):"""
     ) -> str:
         messages = [{"role": "system", "content": system_prompt}]
         
-        # Add conversation history (last 3 exchanges)
-        for msg in self.conversation_history[session_id][-3:]:
+        # Add ALL conversation history (not just last 3)
+        for msg in self.conversation_history[session_id]:  # ← Removed [-3:]
             messages.append({"role": "user", "content": msg["query"]})
             messages.append({"role": "assistant", "content": msg["response"]})
         
+        # Add current message
         messages.append({"role": "user", "content": user_prompt})
+        
+        # Log conversation length for monitoring
+        total_history_messages = len(self.conversation_history[session_id])
+        print(f"📝 Including {total_history_messages} previous exchanges in context")
         
         response = self.client.chat.completions.create(
             model=self.model,
             messages=messages,
             temperature=0.3,
-            max_tokens=2000
+            max_tokens=2500
         )
         
         return response.choices[0].message.content
