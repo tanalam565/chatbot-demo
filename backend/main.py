@@ -1,4 +1,4 @@
-# main.py - Full Updated Code with Better Upload Detection
+# backend/main.py - FULL CODE WITH LLM INTENT CLASSIFICATION
 
 from fastapi import FastAPI, HTTPException, Security, Depends, UploadFile, File, Form
 from fastapi.security import APIKeyHeader
@@ -11,6 +11,7 @@ import uuid
 from services.azure_search_service import AzureSearchService
 from services.llm_service import LLMService
 from services.document_intelligence_service import DocumentIntelligenceService
+from services.intent_service import IntentService
 import config
 
 app = FastAPI(title="Property Management Chatbot API")
@@ -30,6 +31,7 @@ app.add_middleware(
 search_service = AzureSearchService()
 llm_service = LLMService()
 doc_intelligence_service = DocumentIntelligenceService()
+intent_service = IntentService()
 
 # In-memory storage for session documents (temporary user uploads)
 session_documents: Dict[str, list] = {}
@@ -66,74 +68,22 @@ async def chat(request: ChatRequest, authenticated: bool = Depends(verify_api_ke
         print(f"Query: {request.message}")
         print(f"Available sessions: {list(session_documents.keys())}")
         
-        query_lower = request.message.lower().strip()
-        
         # ===== CHECK IF USER HAS UPLOADED DOCUMENTS =====
         has_uploaded_docs = bool(
             request.session_id and request.session_id in session_documents
         )
         print(f"Has uploaded docs: {has_uploaded_docs}")
         
-        # ===== INTENT DETECTION =====
-        
-        # 1. Casual queries (no search needed)
-        casual_queries = [
-            "hi", "hello", "hey", "how are you", "good morning", "good afternoon",
-            "good evening", "thanks", "thank you", "bye", "goodbye"
-        ]
-        is_casual = any(casual in query_lower for casual in casual_queries) and len(query_lower.split()) <= 5
-        
-        # 2. Upload-only queries (only use uploaded docs)
-        upload_only_patterns = [
-            # Direct upload references
-            "upload", "uploaded", "the upload",
-            "describe the upload", "explain the upload", "summarize the upload",
-            "about the upload", "uploaded document", "uploaded file",
-            
-            # "This" references (when user has uploads, likely referring to them)
-            "what is this", "what's this", "describe this", "explain this",
-            "summarize this", "read this", "about this",
-            "this document", "this file", "the document", "the file",
-            
-            # Possessive references
-            "my document", "my file", "document i uploaded", "file i uploaded",
-            "the document i", "the file i",
-            
-            # Question patterns about uploads
-            "what is the uploaded", "what's the uploaded", "what does this",
-            "what's in this", "what is in this", "tell me about this"
-        ]
-        
-        is_upload_only = (
-            has_uploaded_docs and 
-            any(pattern in query_lower for pattern in upload_only_patterns)
+        # ===== LLM-BASED INTENT CLASSIFICATION =====
+        intent_result = await intent_service.classify_intent(
+            request.message, 
+            has_uploaded_docs
         )
         
-        # 3. Comparison queries (needs both uploaded + company docs)
-        comparison_patterns = [
-            "compare", "compliant", "comply", "compliance", "match", "matches",
-            "differ", "difference", "vs", "versus", "according to our",
-            "does this follow", "is this correct", "does this meet",
-            "against our", "with our policy", "standard agreement",
-            "does it comply", "is it compliant", "meets our", "follows our"
-        ]
-        is_comparison = any(pattern in query_lower for pattern in comparison_patterns)
+        intent = intent_result['intent']
+        confidence = intent_result['confidence']
         
-        # 4. Policy/handbook queries (company docs only)
-        policy_patterns = [
-            "our policy", "our policies", "our handbook", "our procedure",
-            "company policy", "how to", "how do i", "what are the steps",
-            "what is the process", "standard procedure", "disaster management",
-            "marketing", "close a deal", "record video", "laws", "regulations",
-            "what are adara", "what is adara", "adara's policies", "adara policies"
-        ]
-        is_policy_only = (
-            any(pattern in query_lower for pattern in policy_patterns) and 
-            not is_comparison and
-            not is_upload_only
-        )
-        
-        print(f"Intent: casual={is_casual}, upload_only={is_upload_only}, comparison={is_comparison}, policy_only={is_policy_only}")
+        print(f"Intent: {intent} (confidence: {confidence:.2f})")
         
         # ===== GET SESSION DOCUMENTS (User Uploads) =====
         session_context = []
@@ -152,34 +102,28 @@ async def chat(request: ChatRequest, authenticated: bool = Depends(verify_api_ke
         # ===== SEARCH INDEXED DOCUMENTS (Company Docs) =====
         indexed_results = []
         
-        # Skip search for casual queries
-        if is_casual:
-            print("Casual query detected - skipping all document search")
+        if intent == "casual":
+            print("Casual query - skipping all document search")
         
-        # Skip search for upload-only queries if user has uploads
-        elif is_upload_only and session_context:
-            print("Upload-only query with uploaded docs - skipping company search")
+        elif intent == "upload_only" and session_context:
+            print("Upload-only query - using uploaded docs only")
         
-        # Search company docs for policy queries
-        elif is_policy_only:
-            print("Policy query - searching company docs only")
+        elif intent == "policy_only":
+            print("Policy query - searching company docs")
             indexed_results = await search_service.search(request.message)
         
-        # Search company docs for comparison queries
-        elif is_comparison:
+        elif intent == "comparison":
             print("Comparison query - searching company docs to compare with uploads")
             indexed_results = await search_service.search(request.message)
         
-        # Search company docs if no uploads exist
         elif not session_context:
             print("No uploads - searching company docs")
             indexed_results = await search_service.search(request.message)
         
-        # Default: search if unclear intent
         else:
-            print("Default: searching company docs")
+            print("Default - searching company docs")
             indexed_results = await search_service.search(request.message)
-            
+        
         # Mark company docs
         for doc in indexed_results:
             doc["source_type"] = "company"
@@ -187,17 +131,17 @@ async def chat(request: ChatRequest, authenticated: bool = Depends(verify_api_ke
         print(f"Found {len(indexed_results)} company documents")
         
         # ===== SMART CONTEXT SELECTION =====
-        if is_upload_only and session_context:
+        if intent == "upload_only" and session_context:
             # Only uploaded docs
             all_context = session_context
             print(f"Context: Using {len(all_context)} uploaded docs ONLY")
             
-        elif is_policy_only and not is_comparison:
+        elif intent == "policy_only" and not intent == "comparison":
             # Only company docs
             all_context = indexed_results
             print(f"Context: Using {len(all_context)} company docs ONLY")
             
-        elif is_comparison and session_context and indexed_results:
+        elif intent == "comparison" and session_context and indexed_results:
             # Both sources for comparison - filter company docs to high relevance only
             filtered_company = [doc for doc in indexed_results if doc["score"] > 2.5]
             all_context = session_context + filtered_company[:3]  # Top 3 company docs
@@ -226,7 +170,7 @@ async def chat(request: ChatRequest, authenticated: bool = Depends(verify_api_ke
             context=all_context[:5] if all_context else [],
             session_id=request.session_id,
             has_uploads=bool(session_context),
-            is_comparison=is_comparison
+            is_comparison=(intent == "comparison")
         )
         
         return ChatResponse(

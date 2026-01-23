@@ -19,7 +19,7 @@ import config
 def update_index_with_vector_field():
     """
     Update existing Azure Search index to add vector field for hybrid search
-    Using text-embedding-3-large with 3072 dimensions
+    Using text-embedding-3-large with 1536 dimensions
     """
     
     print("Connecting to Azure Search...")
@@ -42,23 +42,23 @@ def update_index_with_vector_field():
                 if field.name == "content_vector":
                     if hasattr(field, 'vector_search_dimensions'):
                         current_dims = field.vector_search_dimensions
-                        if current_dims == 3072:
-                            print("✓ Vector field already configured correctly with 3072 dimensions!")
+                        if current_dims == 1536:
+                            print("✓ Vector field already configured correctly with 1536 dimensions!")
                             return
                         else:
-                            print(f"⚠️  Vector field has {current_dims} dimensions, needs update to 3072")
+                            print(f"⚠️  Vector field has {current_dims} dimensions, needs update to 1536")
                             # Remove old field
                             existing_index.fields = [f for f in existing_index.fields if f.name != "content_vector"]
                             break
         
-        print("Adding vector field to index (3072 dimensions for text-embedding-3-large)...")
+        print("Adding vector field to index (1536 dimensions for text-embedding-3-large)...")
         
-        # Add vector field with 3072 dimensions
+        # Add vector field with 1536 dimensions
         vector_field = SearchField(
             name="content_vector",
             type=SearchFieldDataType.Collection(SearchFieldDataType.Single),
             searchable=True,
-            vector_search_dimensions=3072,  # text-embedding-3-large dimensions
+            vector_search_dimensions=1536,  # text-embedding-3-large dimensions
             vector_search_profile_name="my-vector-profile"
         )
         
@@ -89,7 +89,7 @@ def update_index_with_vector_field():
         print("Updating index schema...")
         client.create_or_update_index(existing_index)
         
-        print("✅ Index updated successfully with vector field (3072 dimensions)!")
+        print("✅ Index updated successfully with vector field (1536 dimensions)!")
         print("\n⚠️  IMPORTANT: You need to reindex your documents to populate embeddings.")
         print("Run: python scripts/generate_embeddings_for_existing_docs.py")
         
