@@ -1,4 +1,4 @@
-# backend/services/llm_service.py - FIXED BULLET FORMATTING
+# backend/services/llm_service.py - WITH DOWNLOAD URL SUPPORT
 
 from typing import List, Dict, Optional
 from openai import AzureOpenAI
@@ -94,7 +94,7 @@ SOURCE ATTRIBUTION:
         
         context_text = ""
         doc_number = 1
-        doc_mapping = {}  # Maps doc number to filename
+        doc_mapping = {}  # Maps doc number to filename and download_url
         
         # Add uploaded documents first (higher priority)
         if uploaded_docs:
@@ -103,7 +103,8 @@ SOURCE ATTRIBUTION:
                 context_text += f"\n[Document {doc_number}: {doc['filename']}]\n"
                 doc_mapping[doc_number] = {
                     "filename": doc['filename'],
-                    "type": "uploaded"
+                    "type": "uploaded",
+                    "download_url": doc.get('download_url')
                 }
                 context_text += f"{doc['content']}\n"
                 context_text += f"(End of Document {doc_number})\n"
@@ -118,7 +119,8 @@ SOURCE ATTRIBUTION:
                 context_text += f"\n[Document {doc_number}: {doc['filename']}]\n"
                 doc_mapping[doc_number] = {
                     "filename": doc['filename'],
-                    "type": "company"
+                    "type": "company",
+                    "download_url": doc.get('download_url')
                 }
                 # Allow up to 10,000 chars per company doc
                 content = doc['content'][:10000]
@@ -153,7 +155,8 @@ Answer (use bullet points on separate lines with [DOC_N] citations):"""
                 icon = "📤" if doc_info["type"] == "uploaded" else "📁"
                 sources.append({
                     "filename": f"{icon} {doc_info['filename']}",
-                    "type": doc_info["type"]
+                    "type": doc_info["type"],
+                    "download_url": doc_info.get("download_url")
                 })
         
         return sources
@@ -244,7 +247,8 @@ Answer (use bullet points on separate lines with [DOC_N] citations):"""
                         icon = "📤" if doc_type == "uploaded" else "📁"
                         sources.append({
                             "filename": f"{icon} {filename}",
-                            "type": doc_type
+                            "type": doc_type,
+                            "download_url": doc.get("download_url")
                         })
             
             return {
@@ -263,8 +267,6 @@ Answer (use bullet points on separate lines with [DOC_N] citations):"""
                 "session_id": session_id
             }
     
-    # backend/services/llm_service.py - Send ALL conversation history
-
     async def _generate_azure_openai(
         self, 
         system_prompt: str, 
@@ -273,8 +275,8 @@ Answer (use bullet points on separate lines with [DOC_N] citations):"""
     ) -> str:
         messages = [{"role": "system", "content": system_prompt}]
         
-        # Add ALL conversation history (not just last 3)
-        for msg in self.conversation_history[session_id]:  # ← Removed [-3:]
+        # Add ALL conversation history
+        for msg in self.conversation_history[session_id]:
             messages.append({"role": "user", "content": msg["query"]})
             messages.append({"role": "assistant", "content": msg["response"]})
         

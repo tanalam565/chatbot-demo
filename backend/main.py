@@ -123,14 +123,14 @@ async def chat(request: ChatRequest, authenticated: bool = Depends(verify_api_ke
             
         elif session_context:
             # HAS UPLOADS: Send ALL uploads + top company docs
-            all_context = session_context + indexed_results[:3]
+            all_context = session_context + indexed_results[:10]
             print(f"\n📋 CONTEXT FOR LLM: {len(all_context)} documents")
             print(f"   - ALL {len(session_context)} uploaded documents")
             print(f"   - Top {len(indexed_results[:3])} company documents")
             
         else:
             # NO UPLOADS: Send top company docs only
-            all_context = indexed_results[:5]
+            all_context = indexed_results[:15]
             print(f"\n📋 CONTEXT FOR LLM: {len(all_context)} company documents")
         
         # ===== STEP 5: LOG WHAT'S BEING SENT =====

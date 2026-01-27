@@ -4,6 +4,7 @@ from azure.search.documents import SearchClient
 from azure.search.documents.indexes import SearchIndexerClient
 from azure.search.documents.models import VectorizedQuery
 from azure.core.credentials import AzureKeyCredential
+from services.blob_service import BlobService
 from typing import List, Dict
 import urllib.parse
 import config
@@ -30,6 +31,7 @@ class AzureSearchService:
         )
         
         self.embedding_service = EmbeddingService()
+        self.blob_service = BlobService()  # ADD THIS LINE
         
         print(f"✓ Connected to index: {self.index_name} (Hybrid Search enabled)")
 
@@ -92,16 +94,27 @@ class AzureSearchService:
                 
                 filename = self._extract_filename(result_dict)
                 
-                # Skip chunks with no identifiable filename
                 if filename == "Unknown Document":
                     print(f"  ⚠️  Skipping chunk with no filename")
                     continue
                 
+                # Generate download URL from metadata_storage_name
+                blob_name = result_dict.get("metadata_storage_name", "")
+                download_url = None
+                if blob_name:
+                    try:
+                        print(f"🔗 Attempting download URL for: {blob_name}")  # ADD THIS
+                        download_url = self.blob_service.generate_download_url(blob_name)
+                        print(f"   Result: {download_url is not None}")  # ADD THIS
+                    except Exception as e:
+                        print(f"   ❌ Error: {e}")  # ADD THIS
+                        
                 if content:
                     search_results.append({
                         "content": str(content)[:5000],
                         "filename": filename,
-                        "source_type": "company"
+                        "source_type": "company",
+                        "download_url": download_url  # NEW
                     })
                     print(f"  ✓ Found: {filename}")
                 
@@ -116,7 +129,7 @@ class AzureSearchService:
             import traceback
             traceback.print_exc()
             return await self._fallback_keyword_search(query, top)
-    
+
     async def _fallback_keyword_search(self, query: str, top: int) -> List[Dict]:
         """Fallback to keyword-only search if hybrid search fails"""
         try:
@@ -135,15 +148,21 @@ class AzureSearchService:
                 
                 filename = self._extract_filename(result_dict)
                 
-                # Skip unknown documents in fallback too
                 if filename == "Unknown Document":
                     continue
+                
+                # Generate download URL from metadata_storage_name
+                blob_name = result_dict.get("metadata_storage_name", "")
+                download_url = None
+                if blob_name:
+                    download_url = self.blob_service.generate_download_url(blob_name)
                 
                 if content:
                     search_results.append({
                         "content": str(content)[:5000],
                         "filename": filename,
-                        "source_type": "company"
+                        "source_type": "company",
+                        "download_url": download_url  # ADD THIS
                     })
                 
                 if len(search_results) >= top:

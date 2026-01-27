@@ -1,4 +1,4 @@
-// frontend/src/components/ChatInterface.js - FIXED CLEANUP
+// frontend/src/components/ChatInterface.js - WITH DOUBLE-CLICK DOWNLOAD
 
 import React, { useState, useRef, useEffect } from 'react';
 import { sendMessage } from '../services/api';
@@ -30,7 +30,6 @@ function ChatInterface() {
     scrollToBottom();
   }, [messages]);
 
-  // FIXED: Only cleanup on component unmount (no dependencies!)
   useEffect(() => {
     const cleanupSession = async () => {
       if (uploadedFiles.length > 0 && sessionId) {
@@ -54,7 +53,6 @@ function ChatInterface() {
       }
     };
 
-    // Only cleanup on window close (not on refresh)
     const handleBeforeUnload = (e) => {
       if (uploadedFiles.length > 0) {
         cleanupSession();
@@ -63,13 +61,11 @@ function ChatInterface() {
 
     window.addEventListener('beforeunload', handleBeforeUnload);
 
-    // Cleanup ONLY when component unmounts (page close)
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
-      // Only cleanup if truly unmounting (not on every render)
       cleanupSession();
     };
-  }, []); // ← FIXED: Empty dependency array!
+  }, []);
 
   const handleCopy = (text, index) => {
     navigator.clipboard.writeText(text).then(() => {
@@ -78,6 +74,26 @@ function ChatInterface() {
     }).catch(err => {
       console.error('Failed to copy:', err);
     });
+  };
+
+  const handleCitationDownload = async (source) => {
+    if (!source.download_url) {
+      return;
+    }
+
+    try {
+      const link = document.createElement('a');
+      link.href = source.download_url;
+      link.download = source.filename.replace(/^[📁📤]\s*/, '');
+      link.target = '_blank';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      console.log('✅ Download initiated:', source.filename);
+    } catch (error) {
+      console.error('Download error:', error);
+    }
   };
 
   const handleFileUpload = async (event) => {
@@ -217,8 +233,7 @@ function ChatInterface() {
       console.log('✅ Chat response received');
       console.log('🔑 Backend returned session ID:', response.session_id);
       console.log('📚 Sources count:', response.sources?.length || 0);
-      
-      // Don't update session ID after initial set
+      console.log('🔍 Sources detail:', JSON.stringify(response.sources, null, 2)); // ADD THIS
       if (!sessionId || sessionId === 'temp') {
         console.log('⚠️ Updating session ID from backend');
         setSessionId(response.session_id);
@@ -322,7 +337,12 @@ function ChatInterface() {
                     </div>
                     <ul className="citations-list">
                       {message.sources.map((source, idx) => (
-                        <li key={idx} className="citation-item">
+                        <li 
+                          key={idx} 
+                          className="citation-item"
+                          onDoubleClick={() => handleCitationDownload(source)}
+                          style={{ cursor: source.download_url ? 'pointer' : 'default' }}
+                        >
                           <span className="citation-number">[{idx + 1}]</span>
                           <span className="citation-filename">{source.filename}</span>
                         </li>
