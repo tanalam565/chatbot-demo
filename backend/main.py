@@ -155,12 +155,27 @@ async def chat(request: ChatRequest, authenticated: bool = Depends(verify_api_ke
             is_comparison=False
         )
         
+        # Deduplicate sources by filename - show each document once
+        source_map = {}
+        for source in response["sources"]:
+            filename = source.get("filename", "Unknown")
+            if filename not in source_map:
+                source_map[filename] = source
+
+        unique_sources = list(source_map.values())
+
+        print(f"\n📋 Sources after deduplication: {len(unique_sources)}")
+        for i, src in enumerate(unique_sources, 1):
+            source_type = src.get('source_type', 'unknown')
+            icon = "📤" if source_type == "uploaded" else "📁"
+            print(f"  {i}. {icon} {src.get('filename', 'Unknown')}")
+
         return ChatResponse(
             response=response["answer"],
-            sources=response["sources"],
+            sources=unique_sources,
             session_id=response["session_id"]
         )
-        
+                
     except Exception as e:
         print(f"❌ Chat error: {e}")
         import traceback

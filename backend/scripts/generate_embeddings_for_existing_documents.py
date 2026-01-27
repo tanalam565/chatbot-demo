@@ -1,4 +1,4 @@
-# backend/scripts/generate_embeddings_for_existing_documents.py - UPDATED FOR YOUR SETUP
+# backend/scripts/generate_embeddings_for_existing_documents.py - WITH CHUNKING
 
 import asyncio
 from azure.search.documents import SearchClient
@@ -6,10 +6,47 @@ from azure.core.credentials import AzureKeyCredential
 import sys
 import os
 import urllib.parse
+import hashlib
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import config
 from services.embedding_service import EmbeddingService
+
+
+# CHUNKING CONFIGURATION
+CHUNK_SIZE = 2000  # characters per chunk
+CHUNK_OVERLAP = 500  # overlap between chunks
+
+
+def chunk_text(text: str, chunk_size: int = CHUNK_SIZE, overlap: int = CHUNK_OVERLAP) -> list:
+    """Split text into overlapping chunks"""
+    if not text or len(text) <= chunk_size:
+        return [text]
+    
+    chunks = []
+    start = 0
+    
+    while start < len(text):
+        end = start + chunk_size
+        
+        # If not the last chunk, try to break at sentence/word boundary
+        if end < len(text):
+            # Look for sentence end (. ! ?)
+            for i in range(end, max(start + chunk_size - 200, start), -1):
+                if text[i] in '.!?':
+                    end = i + 1
+                    break
+            else:
+                # No sentence boundary, look for space
+                for i in range(end, max(start + chunk_size - 100, start), -1):
+                    if text[i] == ' ':
+                        end = i
+                        break
+        
+        chunks.append(text[start:end].strip())
+        start = end - overlap  # overlap for context
+    
+    return chunks
 
 
 def _as_clean_str(v):
@@ -34,46 +71,50 @@ def _filename_from_urlish(urlish: str) -> str:
 
 
 def extract_filename(result_dict: dict) -> str:
-    """Extract filename from search result - tries multiple fields"""
-
-    # 1) title (most reliable - comes from metadata_storage_name)
+    """Extract filename from search result"""
     title = _as_clean_str(result_dict.get("title"))
     if title:
         return title
-
-    # 2) metadata_storage_name (original filename)
+    
     storage_name = _as_clean_str(result_dict.get("metadata_storage_name"))
     if storage_name:
         return storage_name
-
-    # 3) filepath
+    
     filepath = _as_clean_str(result_dict.get("filepath"))
     if filepath:
         return filepath.split("/")[-1] if "/" in filepath else filepath
-
-    # 4) url (blob storage path)
+    
     url = _as_clean_str(result_dict.get("url"))
     if url:
         name = _filename_from_urlish(url)
         if name:
             return name
-
-    # 5) parent_id (fallback)
+    
     parent_id = _as_clean_str(result_dict.get("parent_id"))
     if parent_id:
         name = _filename_from_urlish(parent_id)
         if name:
             return name
-
+    
     return "Unknown Document"
 
 
+def generate_chunk_id(parent_id: str, chunk_number: int) -> str:
+    """Generate unique chunk ID"""
+    combined = f"{parent_id}_chunk_{chunk_number}"
+    # Base64 encode to match your existing chunk_id format
+    import base64
+    return base64.b64encode(combined.encode()).decode()
+
+
 async def generate_embeddings_for_all_documents():
-    """Generate embeddings for all documents in the search index"""
+    """Generate embeddings for all documents with chunking"""
 
     print("=" * 70)
-    print("🚀 Starting Embedding Generation for All Documents")
+    print("🚀 Starting Chunked Embedding Generation")
     print("=" * 70)
+    print(f"📏 Chunk size: {CHUNK_SIZE} characters")
+    print(f"🔗 Chunk overlap: {CHUNK_OVERLAP} characters")
 
     embedding_service = EmbeddingService()
 
@@ -84,201 +125,172 @@ async def generate_embeddings_for_all_documents():
     )
 
     try:
-        print(f"\n📊 Fetching documents from index: {config.AZURE_SEARCH_INDEX_NAME}")
-
-        # Fetch one document to identify the key field
-        results = search_client.search(search_text="*", top=1)
-
-        first_result = None
-        for r in results:
-            first_result = dict(r)
-            break
-
-        if not first_result:
-            print("❌ No documents found in index")
-            print("\nℹ️  Make sure your indexer has run successfully:")
-            print("   python scripts/debug_index_contents.py")
-            return
-
-        # Identify the key field
-        key_field = None
-        possible_keys = ["chunk_id", "id", "document_id", "key", "metadata_storage_path"]
-
-        for possible_key in possible_keys:
-            if possible_key in first_result:
-                key_field = possible_key
-                print(f"✓ Found key field: {key_field}")
-                break
-
-        if not key_field:
-            print(f"❌ Could not identify key field")
-            print(f"Available fields: {list(first_result.keys())}")
-            return
-
-        # Show available content fields
-        print(f"\n📝 Available content fields:")
-        for field in ["content", "merged_content"]:
-            if field in first_result:
-                content_val = first_result.get(field, "")
-                if content_val:
-                    print(f"   ✓ {field}: {len(str(content_val))} characters")
-                else:
-                    print(f"   ⚠️  {field}: empty")
-
-        # Fetch all documents (paginated for future scaling)
-        print(f"\n📥 Fetching all documents (with pagination)...")
+        # First, clear existing documents
+        print(f"\n🗑️  Clearing existing index...")
         
-        all_documents = []
-        skip = 0
-        batch_size = 1000
+        # Fetch all existing document IDs
+        existing_results = search_client.search(
+            search_text="*",
+            select=["chunk_id"],
+            top=10000
+        )
         
-        while True:
-            results = search_client.search(
-                search_text="*",
-                top=batch_size,
-                skip=skip,
-                select=[
-                    key_field, 
-                    "content", 
-                    "merged_content",
-                    "title", 
-                    "filepath", 
-                    "url", 
-                    "parent_id",
-                    "metadata_storage_name"
-                ]
-            )
+        existing_ids = [dict(r)["chunk_id"] for r in existing_results]
+        
+        if existing_ids:
+            print(f"   Found {len(existing_ids)} existing entries to delete...")
+            # Delete in batches
+            batch_size = 1000
+            for i in range(0, len(existing_ids), batch_size):
+                batch = existing_ids[i:i+batch_size]
+                docs_to_delete = [{"chunk_id": doc_id} for doc_id in batch]
+                search_client.delete_documents(documents=docs_to_delete)
+                print(f"   Deleted {min(i+batch_size, len(existing_ids))}/{len(existing_ids)}")
+            print(f"   ✅ Index cleared")
+        else:
+            print(f"   Index is empty")
+
+        # Fetch source documents from blob storage metadata
+        print(f"\n📥 Fetching source documents...")
+        
+        # Get unique parent documents (use parent_id or metadata_storage_path)
+        results = search_client.search(
+            search_text="*",
+            top=1000,
+            select=[
+                "parent_id",
+                "content", 
+                "merged_content",
+                "title", 
+                "filepath", 
+                "url",
+                "metadata_storage_name",
+                "metadata_storage_path",
+                "metadata_storage_content_type"
+            ]
+        )
+        
+        # Group by parent document
+        parent_docs = {}
+        for result in results:
+            result_dict = dict(result)
+            parent_id = result_dict.get("parent_id") or result_dict.get("metadata_storage_path")
             
-            batch = list(results)
-            if not batch:
-                break
-                
-            all_documents.extend(batch)
-            skip += batch_size
+            if not parent_id:
+                continue
             
-            if len(batch) < batch_size:
-                break
+            # Skip if already processed
+            if parent_id in parent_docs:
+                continue
+            
+            parent_docs[parent_id] = result_dict
 
-        print(f"✓ Total documents to process: {len(all_documents)}")
+        print(f"✓ Found {len(parent_docs)} unique documents")
 
-        # Process documents and generate embeddings
-        documents_to_update = []
-        processed = 0
-        skipped_no_content = 0
-        skipped_no_key = 0
-        unknown_count = 0
+        # Process each document and create chunks
+        total_chunks_created = 0
+        documents_processed = 0
+        chunks_to_upload = []
 
-        print(f"\n⚙️  Generating embeddings...")
+        print(f"\n⚙️  Processing documents and creating chunks...")
         print("-" * 70)
 
-        for result in all_documents:
-            result_dict = dict(result)
-
-            # Try merged_content first (has OCR + PDF text), fallback to content
-            content = result_dict.get("merged_content", "")
+        for parent_id, doc in parent_docs.items():
+            # Get content
+            content = doc.get("merged_content", "")
             if not content:
-                content = result_dict.get("content", "")
+                content = doc.get("content", "")
             
             if isinstance(content, list):
                 content = " ".join(_as_clean_str(x) for x in content)
-
+            
             content = _as_clean_str(content)
             
             if not content:
-                filename = extract_filename(result_dict)
-                print(f"  ⚠️  Skipping {filename}: No content found")
-                skipped_no_content += 1
+                filename = extract_filename(doc)
+                print(f"  ⚠️  Skipping {filename}: No content")
                 continue
 
-            # Get key value
-            key_value = result_dict.get(key_field)
-            if key_value is None or _as_clean_str(key_value) == "":
-                print(f"  ⚠️  Skipping document: No key value")
-                skipped_no_key += 1
-                continue
+            filename = extract_filename(doc)
+            documents_processed += 1
 
-            filename = extract_filename(result_dict)
-            if filename == "Unknown Document":
-                unknown_count += 1
+            # Split into chunks
+            chunks = chunk_text(content)
+            total_chunks_created += len(chunks)
 
-            processed += 1
-            
-            # Show progress
-            print(f"  [{processed}/{len(all_documents)}] Processing: {filename[:60]}...")
-            print(f"      Content length: {len(content)} chars")
+            print(f"\n  [{documents_processed}] Processing: {filename}")
+            print(f"      Document length: {len(content)} chars")
+            print(f"      Created {len(chunks)} chunks")
 
-            # Generate embedding (truncate to 32k chars to avoid token limits)
-            embedding = embedding_service.generate_embedding(content[:32000])
+            # Process each chunk
+            for chunk_num, chunk_content in enumerate(chunks):
+                # Generate embedding for this chunk
+                embedding = embedding_service.generate_embedding(chunk_content)
 
-            # Verify dimensions
-            if len(embedding) != config.EMBEDDING_DIMENSIONS:
-                print(f"      ⚠️  Warning: Expected {config.EMBEDDING_DIMENSIONS} dims, got {len(embedding)}")
+                # Create chunk document
+                chunk_id = generate_chunk_id(parent_id, chunk_num)
+                
+                chunk_doc = {
+                    "chunk_id": chunk_id,
+                    "parent_id": parent_id,
+                    "chunk_number": chunk_num,
+                    "title": doc.get("title") or filename,
+                    "content": chunk_content,
+                    "merged_content": chunk_content,  # Store chunk content
+                    "filepath": doc.get("filepath"),
+                    "url": doc.get("url"),
+                    "metadata_storage_name": doc.get("metadata_storage_name"),
+                    "metadata_storage_path": doc.get("metadata_storage_path"),
+                    "metadata_storage_content_type": doc.get("metadata_storage_content_type"),
+                    "content_vector": embedding
+                }
+                
+                chunks_to_upload.append(chunk_doc)
 
-            doc_update = {
-                key_field: key_value,
-                "content_vector": embedding
-            }
-            documents_to_update.append(doc_update)
-
-            # Upload in batches of 10 for stability
-            if len(documents_to_update) >= 10:
-                print(f"\n  📤 Uploading batch of {len(documents_to_update)} embeddings...")
-                try:
-                    search_client.merge_or_upload_documents(documents=documents_to_update)
-                    print(f"  ✅ Batch uploaded successfully\n")
-                except Exception as batch_error:
-                    print(f"  ❌ Batch upload error: {batch_error}")
-                    print(f"  ℹ️  Trying one-by-one upload...")
-                    # Fallback: upload one by one
-                    for doc in documents_to_update:
-                        try:
-                            search_client.merge_or_upload_documents(documents=[doc])
-                        except Exception as doc_error:
-                            print(f"    ❌ Failed to upload document: {doc_error}")
-                documents_to_update = []
-
-        # Upload remaining documents
-        if documents_to_update:
-            print(f"\n  📤 Uploading final batch of {len(documents_to_update)} embeddings...")
-            try:
-                search_client.merge_or_upload_documents(documents=documents_to_update)
-                print(f"  ✅ Final batch uploaded successfully")
-            except Exception as batch_error:
-                print(f"  ❌ Final batch upload error: {batch_error}")
-                print(f"  ℹ️  Trying one-by-one upload...")
-                for doc in documents_to_update:
+                # Upload in batches of 50
+                if len(chunks_to_upload) >= 50:
+                    print(f"      📤 Uploading batch of {len(chunks_to_upload)} chunks...")
                     try:
-                        search_client.merge_or_upload_documents(documents=[doc])
-                    except Exception as doc_error:
-                        print(f"    ❌ Failed to upload document: {doc_error}")
+                        search_client.upload_documents(documents=chunks_to_upload)
+                        print(f"      ✅ Batch uploaded")
+                    except Exception as batch_error:
+                        print(f"      ❌ Batch error: {batch_error}")
+                        # Try one by one
+                        for single_doc in chunks_to_upload:
+                            try:
+                                search_client.upload_documents(documents=[single_doc])
+                            except Exception as doc_error:
+                                print(f"        ❌ Failed chunk: {doc_error}")
+                    
+                    chunks_to_upload = []
+
+        # Upload remaining chunks
+        if chunks_to_upload:
+            print(f"\n  📤 Uploading final batch of {len(chunks_to_upload)} chunks...")
+            try:
+                search_client.upload_documents(documents=chunks_to_upload)
+                print(f"  ✅ Final batch uploaded")
+            except Exception as batch_error:
+                print(f"  ❌ Final batch error: {batch_error}")
 
         # Summary
         print("\n" + "=" * 70)
-        print("✅ EMBEDDING GENERATION COMPLETE!")
+        print("✅ CHUNKED EMBEDDING GENERATION COMPLETE!")
         print("=" * 70)
         print(f"📊 Summary:")
-        print(f"   ✓ Successfully processed: {processed} documents")
-        if skipped_no_content:
-            print(f"   ⚠️  Skipped (no content): {skipped_no_content} documents")
-        if skipped_no_key:
-            print(f"   ⚠️  Skipped (no key): {skipped_no_key} documents")
-        if unknown_count:
-            print(f"   ℹ️  Unknown filename: {unknown_count} documents (but embeddings generated)")
-        print(f"\n🎉 Hybrid search is now fully operational!")
+        print(f"   ✓ Documents processed: {documents_processed}")
+        print(f"   ✓ Total chunks created: {total_chunks_created}")
+        print(f"   ✓ Average chunks per document: {total_chunks_created/documents_processed:.1f}")
+        print(f"\n🎉 Your index now has {total_chunks_created} searchable chunks!")
+        print(f"   Each chunk is ~{CHUNK_SIZE} characters")
         print(f"   Model: {config.AZURE_OPENAI_EMBEDDING_MODEL}")
         print(f"   Dimensions: {config.EMBEDDING_DIMENSIONS}")
         print("=" * 70)
 
     except Exception as e:
-        print(f"\n❌ Error generating embeddings: {e}")
+        print(f"\n❌ Error: {e}")
         import traceback
         traceback.print_exc()
-        print("\nℹ️  Troubleshooting:")
-        print("   1. Check if indexer ran successfully:")
-        print("      python scripts/debug_index_contents.py")
-        print("   2. Verify documents are in index:")
-        print("      python scripts/list_docments.py")
-        print("   3. Check Azure OpenAI embedding service is accessible")
 
 
 if __name__ == "__main__":
