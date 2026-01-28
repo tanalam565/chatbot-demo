@@ -36,7 +36,10 @@ class BlobService:
                 account_key=account_key,
                 permission=BlobSasPermissions(read=True),
                 expiry=datetime.utcnow() + timedelta(hours=expiry_hours),
-                content_disposition='attachment'  # Force download
+                # To force download, uncomment the next line and comment the following line
+                content_disposition='attachment'  
+                # To view in new tab, use inline
+                # content_disposition='inline'
             )
             
             # URL encode the blob name for the URL
