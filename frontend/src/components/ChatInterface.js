@@ -1,4 +1,4 @@
-// frontend/src/components/ChatInterface.js - WITH DOUBLE-CLICK DOWNLOAD
+// frontend/src/components/ChatInterface.js - WITH INLINE CITATIONS
 
 import React, { useState, useRef, useEffect } from 'react';
 import { sendMessage } from '../services/api';
@@ -16,6 +16,7 @@ function ChatInterface() {
   const [uploadedFiles, setUploadedFiles] = useState([]);
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
+  const citationsRef = useRef({});
 
   // Log session ID for debugging
   useEffect(() => {
@@ -68,7 +69,9 @@ function ChatInterface() {
   }, []);
 
   const handleCopy = (text, index) => {
-    navigator.clipboard.writeText(text).then(() => {
+    // Remove inline citations from copied text
+    const cleanText = text.replace(/\[(\d+)\]/g, '');
+    navigator.clipboard.writeText(cleanText).then(() => {
       setCopiedIndex(index);
       setTimeout(() => setCopiedIndex(null), 2000);
     }).catch(err => {
@@ -84,7 +87,7 @@ function ChatInterface() {
     try {
       const link = document.createElement('a');
       link.href = source.download_url;
-      link.download = source.filename.replace(/^[📁📤]\s*/, '');
+      link.download = source.filename.replace(/^[📁📤]\s*/, '').split('→')[0].trim();
       link.target = '_blank';
       document.body.appendChild(link);
       link.click();
@@ -94,6 +97,55 @@ function ChatInterface() {
     } catch (error) {
       console.error('Download error:', error);
     }
+  };
+
+  const scrollToCitation = (citationNumber, messageIndex) => {
+    const citationElement = citationsRef.current[`${messageIndex}-${citationNumber}`];
+    if (citationElement) {
+      citationElement.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      // Highlight briefly
+      citationElement.style.background = '#f3e6ff';
+      setTimeout(() => {
+        citationElement.style.background = '';
+      }, 1000);
+    }
+  };
+
+  const renderTextWithCitations = (text, messageIndex) => {
+    // Parse text and replace [N] with styled inline citations
+    const parts = [];
+    let lastIndex = 0;
+    const citationRegex = /\[(\d+)\]/g;
+    let match;
+
+    while ((match = citationRegex.exec(text)) !== null) {
+      // Add text before citation
+      if (match.index > lastIndex) {
+        parts.push(text.substring(lastIndex, match.index));
+      }
+
+      // Add citation as styled element
+      const citationNumber = match[1];
+      parts.push(
+        <span
+          key={`cite-${match.index}`}
+          className="inline-citation"
+          onClick={() => scrollToCitation(citationNumber, messageIndex)}
+          title={`View source ${citationNumber}`}
+        >
+          [{citationNumber}]
+        </span>
+      );
+
+      lastIndex = match.index + match[0].length;
+    }
+
+    // Add remaining text
+    if (lastIndex < text.length) {
+      parts.push(text.substring(lastIndex));
+    }
+
+    return parts.length > 0 ? parts : text;
   };
 
   const handleFileUpload = async (event) => {
@@ -233,7 +285,7 @@ function ChatInterface() {
       console.log('✅ Chat response received');
       console.log('🔑 Backend returned session ID:', response.session_id);
       console.log('📚 Sources count:', response.sources?.length || 0);
-      console.log('🔍 Sources detail:', JSON.stringify(response.sources, null, 2)); // ADD THIS
+      
       if (!sessionId || sessionId === 'temp') {
         console.log('⚠️ Updating session ID from backend');
         setSessionId(response.session_id);
@@ -318,7 +370,11 @@ function ChatInterface() {
                     {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </span>
                 </div>
-                <div className="message-text">{message.content}</div>
+                <div className="message-text">
+                  {message.role === 'assistant' 
+                    ? renderTextWithCitations(message.content, index)
+                    : message.content}
+                </div>
                 
                 {message.role === 'assistant' && !message.error && (
                   <button 
@@ -340,10 +396,11 @@ function ChatInterface() {
                         <li 
                           key={idx} 
                           className="citation-item"
+                          ref={el => citationsRef.current[`${index}-${source.citation_number}`] = el}
                           onDoubleClick={() => handleCitationDownload(source)}
                           style={{ cursor: source.download_url ? 'pointer' : 'default' }}
                         >
-                          <span className="citation-number">[{idx + 1}]</span>
+                          <span className="citation-number">[{source.citation_number}]</span>
                           <span className="citation-filename">{source.filename}</span>
                         </li>
                       ))}

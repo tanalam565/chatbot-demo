@@ -1,4 +1,4 @@
-/* frontend/src/components/ChatInterface.css - UPDATED (No Score Styles) */
+/* frontend/src/components/ChatInterface.css - WITH INLINE CITATION STYLING */
 
 .chat-container {
   flex: 1;
@@ -192,8 +192,30 @@
 
 .message-text {
   font-size: 14px;
-  line-height: 1.5;
+  line-height: 1.6;
   white-space: pre-wrap;
+}
+
+/* Inline citation styling */
+.inline-citation {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--purple);
+  background: #f3e6ff;
+  padding: 1px 5px;
+  border-radius: 3px;
+  margin: 0 2px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  vertical-align: super;
+  line-height: 1;
+}
+
+.inline-citation:hover {
+  background: var(--purple);
+  color: white;
+  transform: translateY(-1px);
 }
 
 .message-header {
@@ -321,9 +343,9 @@
 
 .citation-item {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 0.5rem;
-  padding: 0.25rem 0;
+  padding: 0.35rem 0;
   font-size: 12px;
 }
 
@@ -331,14 +353,15 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 20px;
-  height: 16px;
+  min-width: 22px;
+  height: 18px;
   background-color: var(--purple);
   color: white;
   font-size: 10px;
   font-weight: 600;
   border-radius: 3px;
   padding: 0 0.3rem;
+  flex-shrink: 0;
 }
 
 .citation-filename {
@@ -347,6 +370,7 @@
   color: #5a5480;
   font-size: 12px;
   word-break: break-word;
+  line-height: 1.4;
 }
 
 .input-form {
@@ -462,6 +486,11 @@
     font-size: 14px;
   }
 
+  .inline-citation {
+    font-size: 10px;
+    padding: 1px 4px;
+  }
+
   .input-form {
     padding: 12px 12px;
     gap: 8px;
@@ -554,6 +583,11 @@
 
   .message-text {
     font-size: 13px;
+  }
+
+  .inline-citation {
+    font-size: 9px;
+    padding: 1px 3px;
   }
 
   .input-form {
