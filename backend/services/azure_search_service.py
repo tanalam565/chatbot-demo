@@ -146,7 +146,8 @@ class AzureSearchService:
                     "source_type": "company",
                     "download_url": download_url,
                     "parent_id": parent_id,
-                    "chunk_number": result_dict.get("chunk_number")
+                    "chunk_number": result_dict.get("chunk_number"),
+                    "page_number": result_dict.get("page_number", 1)  # ← ACTUAL PAGE NUMBER FROM PDF
                 }
                 
                 parent_chunks[parent_id]['chunks'].append(chunk_data)
@@ -227,7 +228,8 @@ class AzureSearchService:
                         "content": str(content)[:5000],
                         "filename": filename,
                         "source_type": "company",
-                        "download_url": download_url
+                        "download_url": download_url,
+                        "page_number": result_dict.get("page_number", 1)  # ← ACTUAL PAGE NUMBER
                     })
                     parent_chunks[parent_id] += 1
                 

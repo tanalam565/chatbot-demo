@@ -1,4 +1,4 @@
-# backend/scripts/generate_embeddings_from_blob_storage.py - READ FROM BLOB, NOT INDEX
+# backend/scripts/generate_embeddings_from_blob_storage.py - WITH PAGE NUMBER TRACKING
 
 import asyncio
 from azure.storage.blob import BlobServiceClient
@@ -21,35 +21,73 @@ CHUNK_SIZE = 1000  # characters per chunk
 CHUNK_OVERLAP = 200  # overlap between chunks
 
 
-def chunk_text(text: str, chunk_size: int = CHUNK_SIZE, overlap: int = CHUNK_OVERLAP) -> list:
-    """Split text into overlapping chunks"""
-    if not text or len(text) <= chunk_size:
-        return [text] if text else []
+def chunk_text_with_pages(page_texts: list, chunk_size: int = CHUNK_SIZE, overlap: int = CHUNK_OVERLAP) -> list:
+    """
+    Split text into overlapping chunks while tracking page numbers
     
+    Args:
+        page_texts: List of dicts with {"page_number": int, "text": str}
+        chunk_size: Maximum characters per chunk
+        overlap: Overlap between chunks
+    
+    Returns:
+        List of dicts with {"text": str, "page_number": int, "chunk_number": int}
+    """
     chunks = []
+    chunk_number = 0
+    
+    # Concatenate all page texts with page markers
+    full_text = ""
+    char_to_page = []  # Maps character index to page number
+    
+    for page_info in page_texts:
+        page_num = page_info["page_number"]
+        page_text = page_info["text"]
+        
+        # Track which characters belong to which page
+        for _ in range(len(page_text)):
+            char_to_page.append(page_num)
+        
+        full_text += page_text + " "  # Add space between pages
+        char_to_page.append(page_num)  # For the space
+    
+    # Now chunk the full text and determine page for each chunk
     start = 0
     
-    while start < len(text):
+    while start < len(full_text):
         end = start + chunk_size
         
         # If not the last chunk, try to break at sentence/word boundary
-        if end < len(text):
+        if end < len(full_text):
             # Look for sentence end (. ! ?)
             for i in range(end, max(start + chunk_size - 200, start), -1):
-                if text[i] in '.!?\n':
+                if i < len(full_text) and full_text[i] in '.!?\n':
                     end = i + 1
                     break
             else:
                 # No sentence boundary, look for space
                 for i in range(end, max(start + chunk_size - 100, start), -1):
-                    if text[i] == ' ':
+                    if i < len(full_text) and full_text[i] == ' ':
                         end = i
                         break
         
-        chunk = text[start:end].strip()
-        if chunk:
-            chunks.append(chunk)
-        start = end - overlap if end < len(text) else end
+        chunk_text = full_text[start:end].strip()
+        
+        if chunk_text:
+            # Determine which page this chunk is primarily from
+            # Use the middle of the chunk as the reference point
+            chunk_middle = start + ((end - start) // 2)
+            chunk_middle = min(chunk_middle, len(char_to_page) - 1)
+            primary_page = char_to_page[chunk_middle]
+            
+            chunks.append({
+                "text": chunk_text,
+                "page_number": primary_page,
+                "chunk_number": chunk_number
+            })
+            chunk_number += 1
+        
+        start = end - overlap if end < len(full_text) else end
     
     return chunks
 
@@ -61,12 +99,12 @@ def generate_chunk_id(parent_id: str, chunk_number: int) -> str:
 
 
 async def extract_text_from_blob(blob_client, filename: str, doc_intelligence_client) -> dict:
-    """Download blob and extract text using Document Intelligence"""
+    """Download blob and extract text with page numbers using Document Intelligence"""
     try:
         print(f"   📥 Downloading {filename}...")
         blob_data = blob_client.download_blob().readall()
         
-        print(f"   📄 Extracting text (size: {len(blob_data)} bytes)...")
+        print(f"   📄 Extracting text with page tracking (size: {len(blob_data)} bytes)...")
         
         # Encode to base64
         base64_source = base64.b64encode(blob_data).decode('utf-8')
@@ -84,22 +122,40 @@ async def extract_text_from_blob(blob_client, filename: str, doc_intelligence_cl
         
         result = poller.result()
         
-        # Extract full text
-        full_text = result.content if hasattr(result, 'content') else ""
-        page_count = len(result.pages) if hasattr(result, 'pages') else 0
+        # Extract text page by page
+        page_texts = []
         
-        print(f"   ✅ Extracted {len(full_text)} characters from {page_count} pages")
+        if hasattr(result, 'pages'):
+            for page in result.pages:
+                page_num = page.page_number
+                
+                # Combine all lines on this page
+                page_content = ""
+                if hasattr(page, 'lines'):
+                    page_content = " ".join([line.content for line in page.lines])
+                
+                page_texts.append({
+                    "page_number": page_num,
+                    "text": page_content
+                })
+        
+        page_count = len(page_texts)
+        total_chars = sum(len(p["text"]) for p in page_texts)
+        
+        print(f"   ✅ Extracted {total_chars} characters from {page_count} pages")
         
         return {
-            "text": full_text.strip(),
+            "page_texts": page_texts,
             "page_count": page_count,
             "success": True
         }
         
     except Exception as e:
         print(f"   ❌ Extraction error: {e}")
+        import traceback
+        traceback.print_exc()
         return {
-            "text": "",
+            "page_texts": [],
             "page_count": 0,
             "success": False,
             "error": str(e)
@@ -109,11 +165,12 @@ async def extract_text_from_blob(blob_client, filename: str, doc_intelligence_cl
 async def generate_embeddings_from_blob_storage():
     """
     Generate embeddings by reading full documents from blob storage
-    (not from truncated search index content)
+    with actual page number tracking
     """
 
     print("=" * 70)
     print("🚀 Starting Full Document Embedding Generation from Blob Storage")
+    print("   WITH PAGE NUMBER TRACKING")
     print("=" * 70)
     print(f"📏 Chunk size: {CHUNK_SIZE} characters")
     print(f"🔗 Chunk overlap: {CHUNK_OVERLAP} characters")
@@ -178,7 +235,7 @@ async def generate_embeddings_from_blob_storage():
         documents_processed = 0
         chunks_to_upload = []
 
-        print(f"\n⚙️  Processing PDFs and creating chunks...")
+        print(f"\n⚙️  Processing PDFs and creating chunks with page numbers...")
         print("-" * 70)
 
         for blob_info in pdf_blobs:
@@ -190,32 +247,44 @@ async def generate_embeddings_from_blob_storage():
             # Get blob client
             blob_client = container_client.get_blob_client(blob_name)
             
-            # Extract full text from blob
+            # Extract text page by page from blob
             extraction_result = await extract_text_from_blob(
                 blob_client, 
                 blob_name,
                 doc_intelligence_client
             )
             
-            if not extraction_result['success'] or not extraction_result['text']:
+            if not extraction_result['success'] or not extraction_result['page_texts']:
                 print(f"   ⚠️  Skipping: No text extracted")
                 continue
             
-            full_text = extraction_result['text']
+            page_texts = extraction_result['page_texts']
             page_count = extraction_result['page_count']
             
             # Generate parent_id from blob name
             parent_id = f"blob://{config.AZURE_STORAGE_CONTAINER_NAME}/{blob_name}"
             
-            # Split into chunks
-            chunks = chunk_text(full_text)
+            # Split into chunks while tracking page numbers
+            chunks = chunk_text_with_pages(page_texts)
             total_chunks_created += len(chunks)
 
-            print(f"   📄 Document: {len(full_text)} chars, {page_count} pages")
-            print(f"   ✂️  Created {len(chunks)} chunks")
+            total_chars = sum(len(p["text"]) for p in page_texts)
+            print(f"   📄 Document: {total_chars} chars, {page_count} pages")
+            print(f"   ✂️  Created {len(chunks)} chunks with page numbers")
+
+            # Show sample chunk-to-page mapping
+            if chunks:
+                sample_size = min(3, len(chunks))
+                print(f"   📍 Sample chunk → page mapping:")
+                for i in range(sample_size):
+                    print(f"      Chunk {chunks[i]['chunk_number']} → Page {chunks[i]['page_number']}")
 
             # Process each chunk
-            for chunk_num, chunk_content in enumerate(chunks):
+            for chunk_info in chunks:
+                chunk_content = chunk_info["text"]
+                chunk_num = chunk_info["chunk_number"]
+                page_num = chunk_info["page_number"]
+                
                 # Generate embedding for this chunk
                 embedding = embedding_service.generate_embedding(chunk_content)
 
@@ -226,6 +295,7 @@ async def generate_embeddings_from_blob_storage():
                     "chunk_id": chunk_id,
                     "parent_id": parent_id,
                     "chunk_number": chunk_num,
+                    "page_number": page_num,  # ← ACTUAL PAGE NUMBER FROM PDF
                     "title": blob_name,
                     "content": chunk_content,
                     "merged_content": chunk_content,
@@ -268,12 +338,14 @@ async def generate_embeddings_from_blob_storage():
         # Summary
         print("\n" + "=" * 70)
         print("✅ FULL DOCUMENT EMBEDDING GENERATION COMPLETE!")
+        print("   WITH PAGE NUMBER TRACKING")
         print("=" * 70)
         print(f"📊 Summary:")
         print(f"   ✓ PDF files processed: {documents_processed}")
         print(f"   ✓ Total chunks created: {total_chunks_created}")
         print(f"   ✓ Average chunks per document: {total_chunks_created/documents_processed:.1f}")
-        print(f"\n🎉 Your index now has {total_chunks_created} searchable chunks!")
+        print(f"   ✓ Each chunk has actual page number from PDF")
+        print(f"\n🎉 Your index now has {total_chunks_created} searchable chunks with page numbers!")
         print(f"   Each chunk is ~{CHUNK_SIZE} characters")
         print(f"   Model: {config.AZURE_OPENAI_EMBEDDING_MODEL}")
         print(f"   Dimensions: {config.EMBEDDING_DIMENSIONS}")

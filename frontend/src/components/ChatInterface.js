@@ -1,4 +1,4 @@
-// frontend/src/components/ChatInterface.js - WITH INLINE CITATIONS
+// frontend/src/components/ChatInterface.js - WITH INLINE CITATIONS PARSING [N → Page X]
 
 import React, { useState, useRef, useEffect } from 'react';
 import { sendMessage } from '../services/api';
@@ -70,7 +70,7 @@ function ChatInterface() {
 
   const handleCopy = (text, index) => {
     // Remove inline citations from copied text
-    const cleanText = text.replace(/\[(\d+)\]/g, '');
+    const cleanText = text.replace(/\[(\d+)\s*→\s*Page\s*\d+\]/g, '');
     navigator.clipboard.writeText(cleanText).then(() => {
       setCopiedIndex(index);
       setTimeout(() => setCopiedIndex(null), 2000);
@@ -112,10 +112,10 @@ function ChatInterface() {
   };
 
   const renderTextWithCitations = (text, messageIndex) => {
-    // Parse text and replace [N] with styled inline citations
+    // Parse text and replace [N → Page X] with styled inline citations
     const parts = [];
     let lastIndex = 0;
-    const citationRegex = /\[(\d+)\]/g;
+    const citationRegex = /\[(\d+)\s*→\s*Page\s*(\d+)\]/g;
     let match;
 
     while ((match = citationRegex.exec(text)) !== null) {
@@ -124,16 +124,19 @@ function ChatInterface() {
         parts.push(text.substring(lastIndex, match.index));
       }
 
-      // Add citation as styled element
+      // Add citation as styled element (shows FULL citation with page number)
       const citationNumber = match[1];
+      const pageNumber = match[2];
+      const fullCitation = match[0]; // e.g., "[1 → Page 4]"
+      
       parts.push(
         <span
           key={`cite-${match.index}`}
           className="inline-citation"
           onClick={() => scrollToCitation(citationNumber, messageIndex)}
-          title={`View source ${citationNumber}`}
+          title={`Click to view source ${citationNumber}`}
         >
-          [{citationNumber}]
+          {fullCitation}
         </span>
       );
 

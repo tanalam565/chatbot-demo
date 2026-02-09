@@ -1,4 +1,4 @@
-# backend/services/llm_service.py - WITH INLINE CITATIONS AND CHUNK NUMBERS
+# backend/services/llm_service.py - WITH CITATION RENUMBERING
 
 from typing import List, Dict, Optional
 from openai import AzureOpenAI
@@ -41,29 +41,11 @@ FORMATTING REQUIREMENTS (CRITICAL):
 - Keep each bullet point to 2-3 sentences maximum
 - Start each major section with a clear heading followed by a colon
 
-Example of CORRECT formatting:
+CRITICAL CITATION REQUIREMENT WITH PAGE NUMBERS:
+When you reference information from a document, you MUST cite it using this format:
+[N → Page X] where N is the document number and X is the actual page number from the PDF
 
-Customer Service Policy:
-- All communications must be acknowledged within 24 hours, whether written, electronic, or by phone
-- Team members should maintain professional and courteous communication at all times
-- Specific guidelines are provided for telephone interactions and greetings
-
-Resident Relations:
-- Residents can submit grievances through the Resident Relations email
-- Issues should first be addressed with onsite staff before escalation
-- All complaints must be documented in writing for proper tracking
-
-CRITICAL INLINE CITATION REQUIREMENT:
-You MUST cite information inline using [N] where N is the document number.
-
-Example: "Smoking is prohibited in all units [1]. Lost access cards cost $75 to replace [2]."
-
-RULES:
-- Place [N] at the END of the sentence or claim being cited
-- Use [N] immediately after relevant information, before the period
-- If multiple facts from same document, use same number multiple times
-- Always cite factual claims, policies, or specific details
-- Do NOT put citations on general statements or your own synthesis
+Example: "According to the Move-Out Policy [1 → Page 3], residents must provide 60 days notice."
 
 Guidelines:
 - Prioritize accuracy and completeness
@@ -72,24 +54,24 @@ Guidelines:
 - Provide detailed explanations with context (2-3 sentences per bullet)
 - For ambiguous queries, ask clarifying questions
 - Always ground your answers in the provided documents
-- ALWAYS include inline [N] citations when referencing specific information
+- ALWAYS include [N → Page X] citations when referencing specific information
 - Make responses thorough and informative"""
 
         if has_uploads:
             base_prompt += """
 
 SOURCE ATTRIBUTION:
-- When referencing UPLOADED documents, cite them with their document number [N]
-- When referencing COMPANY documents (policies, handbooks), cite with their document number [N]
+- When referencing UPLOADED documents, say "According to your uploaded document [N → Page X]..." or "In [document name] [N → Page X]..."
+- When referencing COMPANY documents (policies, handbooks), say "According to [policy/handbook name] [N → Page X]..." or "Company policy [N → Page X] states..."
 - Be clear about which source each piece of information comes from
-- If there are multiple uploaded documents and the query is ambiguous, describe ALL of them with citations
-- Provide comprehensive details from the documents with inline [N] citations"""
+- If there are multiple uploaded documents and the query is ambiguous, describe ALL of them with their [N → Page X] citations
+- Provide comprehensive details from the uploaded documents in bullet format"""
         else:
             base_prompt += """
 
 SOURCE ATTRIBUTION:
-- When referencing information, cite with inline [N] numbers (e.g., "According to the Move-Out Policy, residents must provide 60 days notice [1].")
-- Provide comprehensive information from the cited documents"""
+- When referencing information, naturally mention the source with [N → Page X] citation (e.g., "According to the Move-Out Policy [1 → Page 3]..." or "As stated in the Team Member Handbook [2 → Page 15]...")
+- Provide comprehensive information from the cited documents in bullet format"""
 
         return base_prompt
     
@@ -100,28 +82,25 @@ SOURCE ATTRIBUTION:
         
         context_text = ""
         doc_number = 1
-        doc_mapping = {}  # Maps doc number to filename, chunks, and download_url
+        doc_mapping = {}  # Maps doc number to filename, download_url, pages
         
         # Add uploaded documents first (higher priority)
         if uploaded_docs:
             context_text += "=== UPLOADED DOCUMENTS (User's Files) ===\n"
             for doc in uploaded_docs:
-                context_text += f"\n[Document {doc_number}: {doc['filename']}]\n"
+                page_num = doc.get('page_number', 1)  # ← ACTUAL PAGE NUMBER FROM INDEX
                 
-                # Initialize mapping for this document
+                context_text += f"\n[Document {doc_number} - Page {page_num}: {doc['filename']}]\n"
+                
+                # Track this doc
                 if doc_number not in doc_mapping:
                     doc_mapping[doc_number] = {
                         "filename": doc['filename'],
                         "type": "uploaded",
                         "download_url": doc.get('download_url'),
-                        "chunks": []
+                        "pages": set()
                     }
-                
-                # Add chunk number if available
-                chunk_num = doc.get('chunk_number')
-                if chunk_num is not None:
-                    doc_mapping[doc_number]["chunks"].append(chunk_num)
-                    context_text += f"(Chunk {chunk_num})\n"
+                doc_mapping[doc_number]["pages"].add(page_num)
                 
                 context_text += f"{doc['content']}\n"
                 context_text += f"(End of Document {doc_number})\n"
@@ -132,47 +111,26 @@ SOURCE ATTRIBUTION:
             if uploaded_docs:
                 context_text += "\n" + "="*60 + "\n\n"
             context_text += "=== COMPANY DOCUMENTS (Policies, Handbooks, Procedures) ===\n"
-            
-            # Group chunks by parent document
-            parent_groups = {}
             for doc in company_docs:
-                parent_id = doc.get('parent_id', 'unknown')
-                if parent_id not in parent_groups:
-                    parent_groups[parent_id] = {
-                        'filename': doc['filename'],
-                        'chunks': []
-                    }
-                parent_groups[parent_id]['chunks'].append(doc)
-            
-            # Add each parent document with its chunks
-            for parent_id, group in parent_groups.items():
-                filename = group['filename']
-                chunks = group['chunks']
+                page_num = doc.get('page_number', 1)  # ← ACTUAL PAGE NUMBER FROM INDEX
                 
-                context_text += f"\n[Document {doc_number}: {filename}]\n"
+                context_text += f"\n[Document {doc_number} - Page {page_num}: {doc['filename']}]\n"
                 
-                # Initialize mapping for this document
+                # Track this doc
                 if doc_number not in doc_mapping:
                     doc_mapping[doc_number] = {
-                        "filename": filename,
+                        "filename": doc['filename'],
                         "type": "company",
-                        "download_url": chunks[0].get('download_url'),
-                        "chunks": []
+                        "download_url": doc.get('download_url'),
+                        "pages": set()
                     }
+                doc_mapping[doc_number]["pages"].add(page_num)
                 
-                # Add all chunks from this document
-                for chunk in chunks:
-                    chunk_num = chunk.get('chunk_number')
-                    if chunk_num is not None:
-                        doc_mapping[doc_number]["chunks"].append(chunk_num)
-                        context_text += f"\n--- Chunk {chunk_num} ---\n"
-                    
-                    # Allow up to 10,000 chars per chunk
-                    content = chunk['content'][:10000]
-                    context_text += f"{content}\n"
-                    if len(chunk['content']) > 10000:
-                        context_text += f"... (content truncated, original length: {len(chunk['content'])} chars)\n"
-                
+                # Allow up to 10,000 chars per company doc
+                content = doc['content'][:10000]
+                context_text += f"{content}\n"
+                if len(doc['content']) > 10000:
+                    context_text += f"... (content truncated, original length: {len(doc['content'])} chars)\n"
                 context_text += f"(End of Document {doc_number})\n"
                 doc_number += 1
         
@@ -182,53 +140,89 @@ SOURCE ATTRIBUTION:
 
 User question: {query}
 
-Answer (use inline [N] citations and bullet points on separate lines):"""
+Answer (use bullet points on separate lines with [N → Page X] citations):"""
         
         return prompt, doc_mapping
     
-    def _extract_citations(self, response_text: str, doc_mapping: Dict) -> List[Dict]:
-        """Extract [N] citations from LLM response and renumber them sequentially"""
-        # Find all [N] patterns in response
-        citation_pattern = r'\[(\d+)\]'
-        cited_doc_numbers = set(re.findall(citation_pattern, response_text))
+    def _extract_citations_and_renumber(self, response_text: str, doc_mapping: Dict) -> tuple:
+        """
+        Extract citations, deduplicate by filename, renumber sequentially, 
+        and update response text with new numbers
+        """
+        # Find all [N → Page X] or [N] patterns
+        citation_pattern = r'\[(\d+)(?:\s*→\s*Page\s*(\d+))?\]'
+        matches = re.finditer(citation_pattern, response_text)
         
-        # Build sources list with SEQUENTIAL numbering
-        sources = []
-        for new_num, doc_num_str in enumerate(sorted(cited_doc_numbers, key=int), start=1):
-            doc_num = int(doc_num_str)
+        # Track which doc numbers were cited
+        cited_docs = {}  # {doc_num: page_nums}
+        for match in matches:
+            doc_num = int(match.group(1))
+            page_num = match.group(2)
+            if doc_num not in cited_docs:
+                cited_docs[doc_num] = set()
+            if page_num:
+                cited_docs[doc_num].add(int(page_num))
+        
+        # Build unique sources (deduplicate by filename)
+        unique_sources = {}  # {filename: {"new_num": int, "type": str, "url": str, "old_nums": [int]}}
+        new_num = 1
+        
+        for doc_num in sorted(cited_docs.keys()):
             if doc_num in doc_mapping:
                 doc_info = doc_mapping[doc_num]
-                icon = "📤" if doc_info["type"] == "uploaded" else "📁"
+                filename = doc_info['filename']
                 
-                # Build chunk info string
-                chunks = doc_info.get("chunks", [])
-                if chunks:
-                    chunks_sorted = sorted(chunks)
-                    if len(chunks_sorted) == 1:
-                        chunk_info = f"Chunk {chunks_sorted[0]}"
-                    elif len(chunks_sorted) <= 5:
-                        chunk_list = ", ".join(str(c) for c in chunks_sorted)
-                        chunk_info = f"Chunks {chunk_list}"
-                    else:
-                        # Too many chunks, show range
-                        chunk_info = f"Chunks {chunks_sorted[0]}-{chunks_sorted[-1]} ({len(chunks_sorted)} total)"
-                else:
-                    chunk_info = ""
+                # Check if we've already seen this filename
+                if filename not in unique_sources:
+                    unique_sources[filename] = {
+                        "new_num": new_num,
+                        "type": doc_info["type"],
+                        "download_url": doc_info.get("download_url"),
+                        "old_nums": []
+                    }
+                    new_num += 1
                 
-                # Build source entry with SEQUENTIAL number
-                if chunk_info:
-                    source_text = f"{icon} {doc_info['filename']} → {chunk_info}"
-                else:
-                    source_text = f"{icon} {doc_info['filename']}"
-                
-                sources.append({
-                    "filename": source_text,
-                    "type": doc_info["type"],
-                    "download_url": doc_info.get("download_url"),
-                    "citation_number": new_num  # ← CHANGED: Use sequential number, not original doc_num
-                })
+                unique_sources[filename]["old_nums"].append(doc_num)
         
-        return sources
+        # Create renumbering map: old doc num → new sequential num
+        renumber_map = {}  # {old_num: new_num}
+        for filename, info in unique_sources.items():
+            for old_num in info["old_nums"]:
+                renumber_map[old_num] = info["new_num"]
+        
+        # Replace citation numbers in response text
+        def replace_citation(match):
+            old_num = int(match.group(1))
+            page_num = match.group(2)
+            
+            if old_num in renumber_map:
+                new_num = renumber_map[old_num]
+                if page_num:
+                    return f"[{new_num} → Page {page_num}]"
+                else:
+                    return f"[{new_num}]"
+            return match.group(0)  # Keep original if not in map
+        
+        updated_text = re.sub(citation_pattern, replace_citation, response_text)
+        
+        # Build sources list with sequential numbers
+        sources = []
+        for filename, info in sorted(unique_sources.items(), key=lambda x: x[1]["new_num"]):
+            icon = "📤" if info["type"] == "uploaded" else "📁"
+            sources.append({
+                "filename": f"{icon} {filename}",
+                "type": info["type"],
+                "download_url": info.get("download_url"),
+                "citation_number": info["new_num"]
+            })
+        
+        return updated_text, sources
+    
+    def _clean_response(self, response_text: str) -> str:
+        """Remove unnecessary markdown (keep [N → Page X] citations)"""
+        # Just clean up any ** markdown
+        cleaned = re.sub(r'\*\*', '', response_text)
+        return cleaned.strip()
     
     async def generate_response(
         self, 
@@ -269,33 +263,30 @@ Answer (use inline [N] citations and bullet points on separate lines):"""
                 session_id
             )
             
-            # Extract which documents were actually cited
-            sources = self._extract_citations(response, doc_mapping)
-            
-            # Keep inline citations in the response for display
-            # The frontend will render [1], [2] as superscript or styled citations
+            # Extract citations, deduplicate, renumber, and update text
+            cleaned_response = self._clean_response(response)
+            updated_response, sources = self._extract_citations_and_renumber(cleaned_response, doc_mapping)
             
             print(f"✅ Generated response with inline citations")
             print(f"   Documents provided: {len(doc_mapping)}")
-            print(f"   Documents cited: {len(sources)}")
+            print(f"   Unique documents cited: {len(sources)}")
             if sources:
-                for i, src in enumerate(sources, 1):
+                for src in sources:
                     print(f"     [{src['citation_number']}] {src['filename']}")
             else:
-                print(f"   ⚠️  No documents cited (LLM didn't use [N] format)")
+                print(f"   ⚠️  No documents cited")
             
             # Store conversation
             self.conversation_history[session_id].append({
                 "query": query,
-                "response": response
+                "response": updated_response
             })
             
-            # If no citations found, fall back to showing all docs (with warning)
+            # If no citations found, fall back to showing all docs
             if not sources and context:
                 print(f"   ⚠️  Falling back to showing all provided documents")
                 sources = []
                 seen_files = set()
-                doc_num = 1
                 
                 for doc in context:
                     filename = doc["filename"]
@@ -306,13 +297,11 @@ Answer (use inline [N] citations and bullet points on separate lines):"""
                         sources.append({
                             "filename": f"{icon} {filename}",
                             "type": doc_type,
-                            "download_url": doc.get("download_url"),
-                            "citation_number": doc_num
+                            "download_url": doc.get("download_url")
                         })
-                        doc_num += 1
             
             return {
-                "answer": response,  # Keep inline citations [1], [2], etc.
+                "answer": updated_response,
                 "sources": sources,
                 "session_id": session_id
             }
