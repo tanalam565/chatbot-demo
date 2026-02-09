@@ -1,5 +1,3 @@
-# backend/services/azure_search_service.py - UPDATED (No Scores)
-
 from azure.search.documents import SearchClient
 from azure.search.documents.indexes import SearchIndexerClient
 from azure.search.documents.models import VectorizedQuery
@@ -31,9 +29,10 @@ class AzureSearchService:
         )
         
         self.embedding_service = EmbeddingService()
-        self.blob_service = BlobService()  # ADD THIS LINE
+        self.blob_service = BlobService()
         
         print(f"✓ Connected to index: {self.index_name} (Hybrid Search enabled)")
+        print(f"✓ Max chunks per document: {config.MAX_CHUNKS_PER_DOCUMENT}")
 
     def _extract_filename(self, result_dict: dict) -> str:
         """Extract filename from search result - handle parent docs and chunks"""
@@ -65,64 +64,115 @@ class AzureSearchService:
         return "Unknown Document"
 
     async def search(self, query: str, top: int = config.MAX_SEARCH_RESULTS) -> List[Dict]:
-        """Perform hybrid search (keyword + vector) on indexed documents"""
+        """
+        Perform hybrid search (keyword + vector) on indexed documents
+        with per-document chunk limiting to avoid one document dominating results
+        """
         try:
-            print(f"Hybrid search for: '{query}' in index '{self.index_name}'")
+            print(f"\n{'='*70}")
+            print(f"🔍 Hybrid search for: '{query}'")
+            print(f"📊 Target results: {top}")
+            print(f"📄 Max chunks per document: {config.MAX_CHUNKS_PER_DOCUMENT}")
+            print(f"{'='*70}")
             
+            # Generate query embedding
             query_embedding = self.embedding_service.generate_embedding(query)
             
+            # Create vector query
             vector_query = VectorizedQuery(
                 vector=query_embedding,
-                k_nearest_neighbors=top * 3,
+                k_nearest_neighbors=top * 8,  # Get more initial results for filtering
                 fields="content_vector"
             )
             
+            # Perform hybrid search - get more results than needed
             results = self.search_client.search(
                 search_text=query,
                 vector_queries=[vector_query],
-                top=top * 3,
+                top=top * 5,  # Fetch 5x more results to account for per-doc limiting
                 include_total_count=True
             )
             
-            search_results = []
+            # Group chunks by parent_id and limit per document
+            parent_chunks = {}  # {parent_id: [chunks]}
+            processed_results = []
+            
+            print(f"\n📥 Processing search results with per-document limiting...")
+            
             for result in results:
                 result_dict = dict(result)
                 
+                # Get parent_id to group chunks
+                parent_id = result_dict.get("parent_id")
+                if not parent_id:
+                    # No parent_id means it's a standalone document
+                    parent_id = result_dict.get("chunk_id", f"standalone_{len(parent_chunks)}")
+                
+                # Initialize parent tracking
+                if parent_id not in parent_chunks:
+                    parent_chunks[parent_id] = {
+                        'count': 0,
+                        'chunks': [],
+                        'filename': self._extract_filename(result_dict)
+                    }
+                
+                # Check if we've hit the per-document limit
+                if parent_chunks[parent_id]['count'] >= config.MAX_CHUNKS_PER_DOCUMENT:
+                    continue  # Skip this chunk, already have enough from this document
+                
+                # Get content
                 content = result_dict.get("content", "")
                 if isinstance(content, list):
                     content = " ".join(str(item) for item in content)
                 
-                filename = self._extract_filename(result_dict)
-                
-                if filename == "Unknown Document":
-                    print(f"  ⚠️  Skipping chunk with no filename")
+                if not content:
                     continue
+                
+                filename = parent_chunks[parent_id]['filename']
                 
                 # Generate download URL from metadata_storage_name
                 blob_name = result_dict.get("metadata_storage_name", "")
                 download_url = None
                 if blob_name:
                     try:
-                        print(f"🔗 Attempting download URL for: {blob_name}")  # ADD THIS
                         download_url = self.blob_service.generate_download_url(blob_name)
-                        print(f"   Result: {download_url is not None}")  # ADD THIS
                     except Exception as e:
-                        print(f"   ❌ Error: {e}")  # ADD THIS
-                        
-                if content:
-                    search_results.append({
-                        "content": str(content)[:5000],
-                        "filename": filename,
-                        "source_type": "company",
-                        "download_url": download_url  # NEW
-                    })
-                    print(f"  ✓ Found: {filename}")
+                        print(f"   ⚠️  Error generating download URL for {blob_name}: {e}")
                 
-                if len(search_results) >= top:
+                # Add to parent's chunks
+                chunk_data = {
+                    "content": str(content)[:5000],
+                    "filename": filename,
+                    "source_type": "company",
+                    "download_url": download_url,
+                    "parent_id": parent_id,
+                    "chunk_number": result_dict.get("chunk_number")
+                }
+                
+                parent_chunks[parent_id]['chunks'].append(chunk_data)
+                parent_chunks[parent_id]['count'] += 1
+                processed_results.append(chunk_data)
+                
+                # Stop if we have enough results overall
+                if len(processed_results) >= top:
                     break
             
-            print(f"✓ Hybrid search returned {len(search_results)} results")
-            return search_results
+            # Log statistics
+            print(f"\n📊 Retrieval Statistics:")
+            print(f"   ✓ Total unique documents: {len(parent_chunks)}")
+            print(f"   ✓ Total chunks retrieved: {len(processed_results)}")
+            
+            # Show per-document breakdown
+            print(f"\n📄 Chunks per document:")
+            for parent_id, data in parent_chunks.items():
+                filename = data['filename']
+                count = data['count']
+                status = "⚠️ LIMITED" if count >= config.MAX_CHUNKS_PER_DOCUMENT else "✓"
+                print(f"   {status} {filename}: {count} chunks")
+            
+            print(f"{'='*70}\n")
+            
+            return processed_results[:top]
             
         except Exception as e:
             print(f"❌ Hybrid search error: {e}")
@@ -133,15 +183,31 @@ class AzureSearchService:
     async def _fallback_keyword_search(self, query: str, top: int) -> List[Dict]:
         """Fallback to keyword-only search if hybrid search fails"""
         try:
+            print(f"\n⚠️  Falling back to keyword-only search")
+            
             results = self.search_client.search(
                 search_text=query,
-                top=top * 2,
+                top=top * 3,
                 include_total_count=True
             )
             
+            # Apply same per-document limiting
+            parent_chunks = {}
             search_results = []
+            
             for result in results:
                 result_dict = dict(result)
+                
+                parent_id = result_dict.get("parent_id")
+                if not parent_id:
+                    parent_id = result_dict.get("chunk_id", f"standalone_{len(parent_chunks)}")
+                
+                if parent_id not in parent_chunks:
+                    parent_chunks[parent_id] = 0
+                
+                if parent_chunks[parent_id] >= config.MAX_CHUNKS_PER_DOCUMENT:
+                    continue
+                
                 content = result_dict.get("content", "")
                 if isinstance(content, list):
                     content = " ".join(str(item) for item in content)
@@ -151,7 +217,6 @@ class AzureSearchService:
                 if filename == "Unknown Document":
                     continue
                 
-                # Generate download URL from metadata_storage_name
                 blob_name = result_dict.get("metadata_storage_name", "")
                 download_url = None
                 if blob_name:
@@ -162,13 +227,14 @@ class AzureSearchService:
                         "content": str(content)[:5000],
                         "filename": filename,
                         "source_type": "company",
-                        "download_url": download_url  # ADD THIS
+                        "download_url": download_url
                     })
+                    parent_chunks[parent_id] += 1
                 
                 if len(search_results) >= top:
                     break
             
-            print(f"✓ Keyword search returned {len(search_results)} results")
+            print(f"✓ Keyword search returned {len(search_results)} results from {len(parent_chunks)} documents")
             return search_results
             
         except Exception as e:

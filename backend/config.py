@@ -39,5 +39,8 @@ CHATBOT_API_KEY = os.getenv("CHATBOT_API_KEY", "")
 
 # Application Settings
 MAX_SEARCH_RESULTS = 15
-CHUNK_SIZE = 4000
+CHUNK_SIZE = 2000
 CHUNK_OVERLAP = 500
+
+# Retruval Settings: Maximum chunks to retrieve from a single parent document
+MAX_CHUNKS_PER_DOCUMENT = 7
