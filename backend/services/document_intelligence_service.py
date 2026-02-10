@@ -1,3 +1,5 @@
+# backend/services/document_intelligence_service.py
+
 from azure.ai.documentintelligence import DocumentIntelligenceClient
 from azure.ai.documentintelligence.models import AnalyzeDocumentRequest
 from azure.core.credentials import AzureKeyCredential
@@ -33,12 +35,30 @@ class DocumentIntelligenceService:
             
             result = poller.result()
             
-            # Extract text
+            # Extract text PAGE BY PAGE
+            page_texts = []
+            
+            if hasattr(result, 'pages'):
+                for page in result.pages:
+                    page_num = page.page_number
+                    
+                    # Combine all lines on this page
+                    page_content = ""
+                    if hasattr(page, 'lines'):
+                        page_content = " ".join([line.content for line in page.lines])
+                    
+                    page_texts.append({
+                        "page_number": page_num,
+                        "text": page_content
+                    })
+            
+            # Also keep full text for backward compatibility
             full_text = result.content if hasattr(result, 'content') else ""
-            page_count = len(result.pages) if hasattr(result, 'pages') else 0
+            page_count = len(page_texts)
             
             return {
-                "text": full_text.strip(),
+                "text": full_text.strip(),  # Full text (for backward compat)
+                "page_texts": page_texts,    # Per-page breakdown with page numbers
                 "page_count": page_count,
                 "filename": filename,
                 "success": True
@@ -48,6 +68,7 @@ class DocumentIntelligenceService:
             print(f"Error extracting text from {filename}: {e}")
             return {
                 "text": "",
+                "page_texts": [],
                 "page_count": 0,
                 "filename": filename,
                 "success": False,

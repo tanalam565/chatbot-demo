@@ -1,4 +1,4 @@
-# backend/main.py - DEFINITIVE FIX
+# backend/main.py - WITH IMPROVED CASUAL CHAT DETECTION
 
 from fastapi import FastAPI, HTTPException, Security, Depends, UploadFile, File, Form
 from fastapi.security import APIKeyHeader
@@ -71,30 +71,60 @@ async def chat(request: ChatRequest, authenticated: bool = Depends(verify_api_ke
         # ===== STEP 1: GET ALL UPLOADED DOCUMENTS FOR THIS SESSION =====
         session_context = []
         if request.session_id and request.session_id in session_documents:
-            session_context = [
-                {
-                    "content": doc["content"],
-                    "filename": doc["filename"],
-                    "source_type": "uploaded"
-                }
-                for doc in session_documents[request.session_id]
-            ]
-            print(f"\n📤 UPLOADED DOCUMENTS IN SESSION: {len(session_context)}")
-            for i, doc in enumerate(session_context, 1):
-                content_preview = doc['content'][:100].replace('\n', ' ')
-                print(f"  {i}. {doc['filename']}")
+            for doc in session_documents[request.session_id]:
+                # Check if document has page_texts (new format with page tracking)
+                if 'page_texts' in doc and doc['page_texts']:
+                    # Multi-page document - add each page separately
+                    for page_info in doc['page_texts']:
+                        session_context.append({
+                            "content": page_info['text'],
+                            "filename": doc["filename"],
+                            "source_type": "uploaded",
+                            "page_number": page_info['page_number']
+                        })
+                else:
+                    # Old format or single string - add as single page
+                    session_context.append({
+                        "content": doc["content"],
+                        "filename": doc["filename"],
+                        "source_type": "uploaded",
+                        "page_number": 1
+                    })
+            
+            print(f"\n📤 UPLOADED DOCUMENTS IN SESSION: {len(session_documents[request.session_id])} files")
+            total_pages = len(session_context)
+            print(f"   Total pages across all uploads: {total_pages}")
+            for i, doc in enumerate(session_documents[request.session_id], 1):
+                page_count = len(doc.get('page_texts', [])) if 'page_texts' in doc else 1
+                content_preview = doc['content'][:100].replace('\n', ' ') if 'content' in doc else doc.get('page_texts', [{}])[0].get('text', '')[:100].replace('\n', ' ')
+                print(f"  {i}. {doc['filename']} ({page_count} pages)")
                 print(f"     Content preview: {content_preview}...")
-                print(f"     Total chars: {len(doc['content'])}")
         else:
             print(f"\n📤 No uploaded documents in this session")
         
-        # ===== STEP 2: CHECK IF CASUAL CHAT =====
+        # ===== STEP 2: CHECK IF CASUAL CHAT (IMPROVED) =====
         casual_patterns = [
             'hi', 'hello', 'hey', 'how are you', 'thanks', 
-            'thank you', 'bye', 'goodbye', 'good morning', 'good evening'
+            'thank you', 'bye', 'goodbye', 'good morning', 'good evening',
+            'sup', 'what\'s up', 'wassup', 'yo', 'howdy', 'good night'
         ]
+        
         query_lower = request.message.lower().strip()
-        is_casual = query_lower in casual_patterns or len(query_lower.split()) <= 2 and any(p in query_lower for p in casual_patterns)
+        is_casual = False
+        
+        # Method 1: Exact match
+        if query_lower in casual_patterns:
+            is_casual = True
+        # Method 2: Short queries (1-2 words) containing casual words
+        elif len(query_lower.split()) <= 2:
+            if any(p in query_lower for p in casual_patterns):
+                is_casual = True
+        # Method 3: Fuzzy match for common variations (handles typos)
+        elif any(pattern in query_lower for pattern in ['how are', 'how r u', 'how r you', 'hows it going', 'how do you do']):
+            is_casual = True
+        # Method 4: Very short queries (likely greetings)
+        elif len(query_lower.split()) == 1 and len(query_lower) <= 6:
+            is_casual = True
         
         print(f"\n💬 Query Type: {'Casual chat' if is_casual else 'Document query'}")
         
@@ -113,7 +143,7 @@ async def chat(request: ChatRequest, authenticated: bool = Depends(verify_api_ke
         else:
             print(f"\n🔍 Skipping document search (casual chat)")
         
-        # ===== STEP 4: BUILD CONTEXT FOR LLM (CRITICAL!) =====
+        # ===== STEP 4: BUILD CONTEXT FOR LLM =====
         all_context = []
         
         if is_casual:
@@ -122,23 +152,24 @@ async def chat(request: ChatRequest, authenticated: bool = Depends(verify_api_ke
             print(f"\n📋 CONTEXT FOR LLM: Empty (casual chat)")
             
         elif session_context:
-            # HAS UPLOADS: Send ALL uploads + top company docs
-            all_context = session_context + indexed_results[:10]
-            print(f"\n📋 CONTEXT FOR LLM: {len(all_context)} documents")
-            print(f"   - ALL {len(session_context)} uploaded documents")
-            print(f"   - Top {len(indexed_results[:3])} company documents")
+            # HAS UPLOADS: Send ALL upload pages + top 15 company docs
+            all_context = session_context + indexed_results[:15]
+            print(f"\n📋 CONTEXT FOR LLM: {len(all_context)} document pages")
+            print(f"   - ALL {len(session_context)} uploaded pages")
+            print(f"   - Top {len(indexed_results[:15])} company documents")
             
         else:
-            # NO UPLOADS: Send top company docs only
+            # NO UPLOADS: Send top 15 company docs only
             all_context = indexed_results[:15]
             print(f"\n📋 CONTEXT FOR LLM: {len(all_context)} company documents")
         
         # ===== STEP 5: LOG WHAT'S BEING SENT =====
-        print(f"\n📤 SENDING TO LLM ({len(all_context)} documents):")
+        print(f"\n📤 SENDING TO LLM ({len(all_context)} document pages):")
         for i, doc in enumerate(all_context, 1):
             doc_type = doc.get('source_type', 'unknown')
+            page_num = doc.get('page_number', 1)
             icon = "📤" if doc_type == "uploaded" else "📁"
-            print(f"  {i}. {icon} [{doc_type}] {doc['filename']}")
+            print(f"  {i}. {icon} [{doc_type}] {doc['filename']} - Page {page_num}")
             print(f"      Content length: {len(doc.get('content', ''))} chars")
         
         if not all_context and not is_casual:
@@ -243,14 +274,16 @@ async def upload_document(
         
         session_documents[session_id].append({
             "filename": file.filename,
-            "content": extraction_result['text'],
+            "content": extraction_result['text'],  # Full text for backward compat
+            "page_texts": extraction_result.get('page_texts', []),  # Per-page text with page numbers
             "page_count": extraction_result['page_count']
         })
         
         print(f"✅ Stored in session: {session_id}")
         print(f"📊 Session now has {len(session_documents[session_id])} documents:")
         for i, doc in enumerate(session_documents[session_id], 1):
-            print(f"   {i}. {doc['filename']} ({len(doc['content'])} chars)")
+            page_count = len(doc.get('page_texts', [])) if 'page_texts' in doc else doc.get('page_count', 1)
+            print(f"   {i}. {doc['filename']} ({page_count} pages, {len(doc.get('content', ''))} chars)")
         print(f"📊 Total active sessions: {len(session_documents)}")
         print(f"{'='*60}\n")
         

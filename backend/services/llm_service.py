@@ -1,4 +1,4 @@
-# backend/services/llm_service.py - WITH CITATION RENUMBERING
+# backend/services/llm_service.py - WITH FIXED FALLBACK CITATIONS
 
 from typing import List, Dict, Optional
 from openai import AzureOpenAI
@@ -88,7 +88,7 @@ SOURCE ATTRIBUTION:
         if uploaded_docs:
             context_text += "=== UPLOADED DOCUMENTS (User's Files) ===\n"
             for doc in uploaded_docs:
-                page_num = doc.get('page_number', 1)  # ← ACTUAL PAGE NUMBER FROM INDEX
+                page_num = doc.get('page_number', 1)
                 
                 context_text += f"\n[Document {doc_number} - Page {page_num}: {doc['filename']}]\n"
                 
@@ -103,7 +103,7 @@ SOURCE ATTRIBUTION:
                 doc_mapping[doc_number]["pages"].add(page_num)
                 
                 context_text += f"{doc['content']}\n"
-                context_text += f"(End of Document {doc_number})\n"
+                context_text += f"(End of Document {doc_number} - Page {page_num})\n"
                 doc_number += 1
         
         # Add company documents
@@ -112,7 +112,7 @@ SOURCE ATTRIBUTION:
                 context_text += "\n" + "="*60 + "\n\n"
             context_text += "=== COMPANY DOCUMENTS (Policies, Handbooks, Procedures) ===\n"
             for doc in company_docs:
-                page_num = doc.get('page_number', 1)  # ← ACTUAL PAGE NUMBER FROM INDEX
+                page_num = doc.get('page_number', 1)
                 
                 context_text += f"\n[Document {doc_number} - Page {page_num}: {doc['filename']}]\n"
                 
@@ -131,7 +131,7 @@ SOURCE ATTRIBUTION:
                 context_text += f"{content}\n"
                 if len(doc['content']) > 10000:
                     context_text += f"... (content truncated, original length: {len(doc['content'])} chars)\n"
-                context_text += f"(End of Document {doc_number})\n"
+                context_text += f"(End of Document {doc_number} - Page {page_num})\n"
                 doc_number += 1
         
         prompt = f"""Context from documents:
@@ -282,23 +282,31 @@ Answer (use bullet points on separate lines with [N → Page X] citations):"""
                 "response": updated_response
             })
             
-            # If no citations found, fall back to showing all docs
+            # If no citations found, fall back to showing all docs (WITH CITATION NUMBERS)
             if not sources and context:
-                print(f"   ⚠️  Falling back to showing all provided documents")
-                sources = []
-                seen_files = set()
-                
-                for doc in context:
-                    filename = doc["filename"]
-                    if filename not in seen_files:
-                        seen_files.add(filename)
-                        doc_type = doc.get("source_type", "unknown")
-                        icon = "📤" if doc_type == "uploaded" else "📁"
-                        sources.append({
-                            "filename": f"{icon} {filename}",
-                            "type": doc_type,
-                            "download_url": doc.get("download_url")
-                        })
+                # Only show fallback if there are enough docs (likely a real query)
+                if len(context) >= 5:
+                    print(f"   ⚠️  Falling back to showing all provided documents")
+                    sources = []
+                    seen_files = set()
+                    citation_num = 1  # Start citation numbering
+                    
+                    for doc in context:
+                        filename = doc["filename"]
+                        if filename not in seen_files:
+                            seen_files.add(filename)
+                            doc_type = doc.get("source_type", "unknown")
+                            icon = "📤" if doc_type == "uploaded" else "📁"
+                            sources.append({
+                                "filename": f"{icon} {filename}",
+                                "type": doc_type,
+                                "download_url": doc.get("download_url"),
+                                "citation_number": citation_num  # Add citation number
+                            })
+                            citation_num += 1
+                else:
+                    # Likely casual chat that slipped through - don't show sources
+                    print(f"   ℹ️  No citations and few docs - likely casual chat, not showing sources")
             
             return {
                 "answer": updated_response,
