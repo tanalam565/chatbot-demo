@@ -226,7 +226,7 @@ function ChatInterface() {
 
         const systemMessage = {
           role: 'system',
-          content: `✓ Uploaded ${successCount} document(s): ${fileDetails}. Note: Only the first 15 pages of each file are read. ${uploadsRemaining} upload(s) remaining.`,
+          content: `✓ Uploaded ${successCount} document(s): ${fileDetails}. Note: Only the first 15 pages of each file are read.`,
           timestamp: new Date()
         };
         setMessages(prev => [...prev, systemMessage]);

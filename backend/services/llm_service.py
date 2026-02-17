@@ -316,29 +316,6 @@ Answer (use bullet points on separate lines with [N → Page X] citations):"""
             history.append({"query": query, "response": updated_response})
             await self._save_history(session_id, history)
 
-            # Fallback: show all provided docs if no citations found
-            if not sources and context:
-                if len(context) >= 5:
-                    print(f"   ⚠️  Falling back to showing all provided documents")
-                    sources = []
-                    seen_files = set()
-                    citation_num = 1
-                    for doc in context:
-                        filename = doc["filename"]
-                        if filename not in seen_files:
-                            seen_files.add(filename)
-                            doc_type = doc.get("source_type", "unknown")
-                            icon = "📤" if doc_type == "uploaded" else "📁"
-                            sources.append({
-                                "filename": f"{icon} {filename}",
-                                "type": doc_type,
-                                "download_url": doc.get("download_url"),
-                                "citation_number": citation_num
-                            })
-                            citation_num += 1
-                else:
-                    print(f"   ℹ️  No citations and few docs - likely casual chat, not showing sources")
-
             return {
                 "answer": updated_response,
                 "sources": sources,

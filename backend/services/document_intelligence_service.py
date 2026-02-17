@@ -70,7 +70,50 @@ class DocumentIntelligenceService:
             }
 
     async def extract_text(self, file_content: bytes, filename: str) -> dict:
-        """Async extraction with REQUEST_TIMEOUT_SECONDS hard timeout"""
+        """Extract text from file - handles .txt directly, others via Document Intelligence"""
+        
+        # Handle plain text files directly without Document Intelligence
+        if filename.lower().endswith('.txt'):
+            try:
+                text = file_content.decode('utf-8')
+                
+                # Split into pages (every 2000 chars = 1 "page" for consistency)
+                page_texts = []
+                page_size = 2000
+                page_num = 1
+                
+                for i in range(0, len(text), page_size):
+                    page_content = text[i:i + page_size]
+                    if page_num > config.MAX_UPLOAD_PAGES:
+                        print(f"   ⚠️  Stopping at page {config.MAX_UPLOAD_PAGES} (MAX_UPLOAD_PAGES limit)")
+                        break
+                    page_texts.append({
+                        "page_number": page_num,
+                        "text": page_content
+                    })
+                    page_num += 1
+                
+                print(f"   ✅ Extracted {len(text)} characters from {len(page_texts)} pages (plain text)")
+                
+                return {
+                    "text": text.strip(),
+                    "page_texts": page_texts,
+                    "page_count": len(page_texts),
+                    "filename": filename,
+                    "success": True
+                }
+            except UnicodeDecodeError as e:
+                print(f"Error decoding text file {filename}: {e}")
+                return {
+                    "text": "",
+                    "page_texts": [],
+                    "page_count": 0,
+                    "filename": filename,
+                    "success": False,
+                    "error": "File is not valid UTF-8 text"
+                }
+        
+        # Use Document Intelligence for PDFs, images, DOCX
         try:
             return await asyncio.wait_for(
                 asyncio.to_thread(self._extract_sync, file_content, filename),
