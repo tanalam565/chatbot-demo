@@ -1,4 +1,4 @@
-# backend/services/llm_service.py - WITH REDIS HISTORY, TRUNCATION, RETRY, ASYNC
+# backend/services/llm_service.py - WITH CONNECTION POOLING
 
 from typing import List, Dict, Optional
 from openai import AzureOpenAI, RateLimitError, APIConnectionError
@@ -9,14 +9,17 @@ import asyncio
 import config
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 from services.redis_service import get_redis_client
+from services.http_client_service import get_shared_http_client
 
 
 class LLMService:
     def __init__(self):
+        # Use shared HTTP client for connection pooling
         self.client = AzureOpenAI(
             api_key=config.AZURE_OPENAI_API_KEY,
             api_version=config.AZURE_OPENAI_API_VERSION,
-            azure_endpoint=config.AZURE_OPENAI_ENDPOINT
+            azure_endpoint=config.AZURE_OPENAI_ENDPOINT,
+            http_client=get_shared_http_client()  # ← SHARED POOL
         )
         self.model = config.AZURE_OPENAI_DEPLOYMENT_NAME
 

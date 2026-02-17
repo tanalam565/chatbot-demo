@@ -1,17 +1,20 @@
-# backend/services/embedding_service.py - WITH RETRY
+# backend/services/embedding_service.py - WITH CONNECTION POOLING
 
 from openai import AzureOpenAI, RateLimitError, APIConnectionError
 from typing import List
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 import config
+from services.http_client_service import get_shared_http_client
 
 
 class EmbeddingService:
     def __init__(self):
+        # Use shared HTTP client for connection pooling
         self.client = AzureOpenAI(
             api_version=config.AZURE_OPENAI_EMBEDDING_API_VERSION,
             azure_endpoint=config.AZURE_OPENAI_EMBEDDING_ENDPOINT,
-            api_key=config.AZURE_OPENAI_EMBEDDING_KEY
+            api_key=config.AZURE_OPENAI_EMBEDDING_KEY,
+            http_client=get_shared_http_client()  # ← SHARED POOL
         )
         self.deployment = config.AZURE_OPENAI_EMBEDDING_DEPLOYMENT
         self.model = config.AZURE_OPENAI_EMBEDDING_MODEL

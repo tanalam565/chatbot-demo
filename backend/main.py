@@ -1,4 +1,4 @@
-# backend/main.py - WITH REDIS SESSIONS, RATE LIMITING, FILE VALIDATION
+# backend/main.py - WITH CONNECTION POOLING
 
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Security, Depends, UploadFile, File, Form, Request
@@ -18,6 +18,7 @@ from services.azure_search_service import AzureSearchService
 from services.llm_service import LLMService
 from services.document_intelligence_service import DocumentIntelligenceService
 from services.redis_service import get_redis_client, close_redis
+from services.http_client_service import close_shared_http_client
 import config
 
 # ── File validation via magic bytes (not trusting content-type header) ──────────
@@ -58,11 +59,19 @@ def validate_file_content(content: bytes, content_type: str) -> bool:
     return False
 
 
-# ── Lifespan: close Redis pool on shutdown ───────────────────────────────────────
+# ── Lifespan: close Redis pool and HTTP client on shutdown ───────────────────────
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    print("\n" + "="*60)
+    print("🚀 Starting application with connection pooling")
+    print("="*60)
     yield
+    print("\n" + "="*60)
+    print("🛑 Shutting down - closing connections")
+    print("="*60)
     await close_redis()
+    close_shared_http_client()  # ← Close shared HTTP client
+    print("✓ All connections closed")
 
 
 # ── Rate limiter ─────────────────────────────────────────────────────────────────
