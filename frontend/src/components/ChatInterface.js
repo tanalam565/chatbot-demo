@@ -18,7 +18,6 @@ function ChatInterface() {
   const fileInputRef = useRef(null);
   const citationsRef = useRef({});
 
-  // Log session ID for debugging
   useEffect(() => {
     console.log('🔑 Session ID:', sessionId);
   }, [sessionId]);
@@ -69,7 +68,6 @@ function ChatInterface() {
   }, []);
 
   const handleCopy = (text, index) => {
-    // Remove inline citations from copied text
     const cleanText = text.replace(/\[(\d+)\s*→\s*Page\s*\d+\]/g, '');
     navigator.clipboard.writeText(cleanText).then(() => {
       setCopiedIndex(index);
@@ -92,7 +90,6 @@ function ChatInterface() {
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      
       console.log('✅ Download initiated:', source.filename);
     } catch (error) {
       console.error('Download error:', error);
@@ -103,7 +100,6 @@ function ChatInterface() {
     const citationElement = citationsRef.current[`${messageIndex}-${citationNumber}`];
     if (citationElement) {
       citationElement.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-      // Highlight briefly
       citationElement.style.background = '#f3e6ff';
       setTimeout(() => {
         citationElement.style.background = '';
@@ -112,23 +108,19 @@ function ChatInterface() {
   };
 
   const renderTextWithCitations = (text, messageIndex) => {
-    // Parse text and replace [N → Page X] with styled inline citations
     const parts = [];
     let lastIndex = 0;
     const citationRegex = /\[(\d+)\s*→\s*Page\s*(\d+)\]/g;
     let match;
 
     while ((match = citationRegex.exec(text)) !== null) {
-      // Add text before citation
       if (match.index > lastIndex) {
         parts.push(text.substring(lastIndex, match.index));
       }
 
-      // Add citation as styled element (shows FULL citation with page number)
       const citationNumber = match[1];
-      const pageNumber = match[2];
-      const fullCitation = match[0]; // e.g., "[1 → Page 4]"
-      
+      const fullCitation = match[0];
+
       parts.push(
         <span
           key={`cite-${match.index}`}
@@ -143,7 +135,6 @@ function ChatInterface() {
       lastIndex = match.index + match[0].length;
     }
 
-    // Add remaining text
     if (lastIndex < text.length) {
       parts.push(text.substring(lastIndex));
     }
@@ -154,6 +145,24 @@ function ChatInterface() {
   const handleFileUpload = async (event) => {
     const files = event.target.files;
     if (!files || files.length === 0) return;
+
+    // Client-side file size validation
+    const MAX_FILE_SIZE_MB = 15;
+    const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
+
+    for (const file of files) {
+      if (file.size > MAX_FILE_SIZE_BYTES) {
+        const errorMessage = {
+          role: 'system',
+          content: `✗ "${file.name}" exceeds the ${MAX_FILE_SIZE_MB}MB limit. Please upload a smaller file.`,
+          timestamp: new Date(),
+          error: true
+        };
+        setMessages(prev => [...prev, errorMessage]);
+        if (fileInputRef.current) fileInputRef.current.value = '';
+        return;
+      }
+    }
 
     setUploading(true);
     const uploadResults = [];
@@ -182,7 +191,7 @@ function ChatInterface() {
         if (response.ok) {
           const result = await response.json();
           console.log('✅ Upload successful. Backend returned session:', result.session_id);
-          
+
           uploadResults.push({
             name: file.name,
             success: true,
@@ -200,9 +209,14 @@ function ChatInterface() {
 
       const successCount = uploadResults.filter(r => r.success).length;
       if (successCount > 0) {
+        const successFiles = uploadResults.filter(r => r.success);
+        const fileDetails = successFiles.map(f =>
+          `${f.name} (${f.pages} page${f.pages !== 1 ? 's' : ''} read)`
+        ).join(', ');
+
         const systemMessage = {
           role: 'system',
-          content: `✓ Uploaded ${successCount} document(s). You can now ask questions about them!`,
+          content: `✓ Uploaded ${successCount} document(s): ${fileDetails}.`,
           timestamp: new Date()
         };
         setMessages(prev => [...prev, systemMessage]);
@@ -227,7 +241,7 @@ function ChatInterface() {
 
   const handleClearUploads = async () => {
     if (uploadedFiles.length === 0) return;
-    
+
     if (!window.confirm(`Delete ${uploadedFiles.length} uploaded document(s)?`)) {
       return;
     }
@@ -284,27 +298,24 @@ function ChatInterface() {
 
     try {
       const response = await sendMessage(input, sessionId);
-      
+
       console.log('✅ Chat response received');
       console.log('🔑 Backend returned session ID:', response.session_id);
       console.log('📚 Sources count:', response.sources?.length || 0);
-      
+
       if (!sessionId || sessionId === 'temp') {
-        console.log('⚠️ Updating session ID from backend');
         setSessionId(response.session_id);
       } else if (response.session_id !== sessionId) {
         console.warn('⚠️ Backend returned different session ID!');
-        console.warn('   Frontend:', sessionId);
-        console.warn('   Backend:', response.session_id);
       }
-      
+
       const botMessage = {
         role: 'assistant',
         content: response.response,
         sources: response.sources,
         timestamp: new Date()
       };
-      
+
       setMessages(prev => [...prev, botMessage]);
     } catch (error) {
       console.error('Chat error:', error);
@@ -336,12 +347,13 @@ function ChatInterface() {
         <label htmlFor="file-upload" className={`upload-button ${uploading ? 'uploading' : ''}`}>
           {uploading ? 'Uploading...' : 'Upload Documents'}
         </label>
+        <span className="upload-limits">Max 15MB · First 15 pages only per upload</span>
         {uploadedFiles.length > 0 && (
           <>
             <span className="uploaded-count">
               {uploadedFiles.length} file(s) uploaded
             </span>
-            <button 
+            <button
               className="clear-button"
               onClick={handleClearUploads}
               title="Delete uploaded documents"
@@ -360,7 +372,7 @@ function ChatInterface() {
             <p>I can help you with move-out procedures, lease agreements, maintenance policies, and more.</p>
           </div>
         )}
-        
+
         {messages.map((message, index) => (
           <div key={index} className={`message ${message.role} ${message.error ? 'error' : ''}`}>
             {message.role !== 'system' && (
@@ -374,13 +386,13 @@ function ChatInterface() {
                   </span>
                 </div>
                 <div className="message-text">
-                  {message.role === 'assistant' 
+                  {message.role === 'assistant'
                     ? renderTextWithCitations(message.content, index)
                     : message.content}
                 </div>
-                
+
                 {message.role === 'assistant' && !message.error && (
-                  <button 
+                  <button
                     className="copy-button"
                     onClick={() => handleCopy(message.content, index)}
                     title="Copy message"
@@ -388,7 +400,7 @@ function ChatInterface() {
                     {copiedIndex === index ? '✓ Copied' : '📋 Copy'}
                   </button>
                 )}
-                
+
                 {message.sources && message.sources.length > 0 && (
                   <div className="citations">
                     <div className="citations-header">
@@ -396,8 +408,8 @@ function ChatInterface() {
                     </div>
                     <ul className="citations-list">
                       {message.sources.map((source, idx) => (
-                        <li 
-                          key={idx} 
+                        <li
+                          key={idx}
                           className="citation-item"
                           ref={el => citationsRef.current[`${index}-${source.citation_number}`] = el}
                           onDoubleClick={() => handleCitationDownload(source)}
@@ -419,7 +431,7 @@ function ChatInterface() {
             )}
           </div>
         ))}
-        
+
         {loading && (
           <div className="message assistant loading">
             <div className="message-content">
@@ -435,7 +447,7 @@ function ChatInterface() {
             </div>
           </div>
         )}
-        
+
         <div ref={messagesEndRef} />
       </div>
 

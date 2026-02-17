@@ -2,11 +2,13 @@ from azure.search.documents import SearchClient
 from azure.search.documents.indexes import SearchIndexerClient
 from azure.search.documents.models import VectorizedQuery
 from azure.core.credentials import AzureKeyCredential
+from azure.core.exceptions import ServiceRequestError, HttpResponseError
 from services.blob_service import BlobService
 from typing import List, Dict
 import urllib.parse
 import asyncio
 import config
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 from services.embedding_service import EmbeddingService
 
 
@@ -63,6 +65,11 @@ class AzureSearchService:
 
     # ── Sync helpers (run via asyncio.to_thread) ─────────────────────────────────
 
+    @retry(
+        retry=retry_if_exception_type((ServiceRequestError, HttpResponseError)),
+        wait=wait_exponential(multiplier=1, min=2, max=10),
+        stop=stop_after_attempt(3)
+    )
     def _execute_search_sync(self, query: str, vector_query, top: int) -> list:
         """Execute hybrid search synchronously and return consumed list of dicts"""
         results = self.search_client.search(
@@ -73,6 +80,11 @@ class AzureSearchService:
         )
         return [dict(r) for r in results]
 
+    @retry(
+        retry=retry_if_exception_type((ServiceRequestError, HttpResponseError)),
+        wait=wait_exponential(multiplier=1, min=2, max=10),
+        stop=stop_after_attempt(3)
+    )
     def _execute_keyword_search_sync(self, query: str, top: int) -> list:
         """Execute keyword-only search synchronously"""
         results = self.search_client.search(

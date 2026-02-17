@@ -74,11 +74,7 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "https://fluffy-spoon-pj7rwgw4566xc7477-3000.app.github.dev",
-        "https://*.app.github.dev"
-    ],
+    allow_origins=config.CORS_ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -442,8 +438,17 @@ async def run_indexer(authenticated: bool = Depends(verify_api_key)):
 
 @app.get("/api/health")
 async def health_check():
-    """Public health check endpoint"""
-    return {"status": "healthy"}
+    """Health check — verifies Redis is reachable"""
+    health = {"status": "healthy", "redis": "healthy"}
+
+    try:
+        redis_client = await get_redis_client()
+        await redis_client.ping()
+    except Exception as e:
+        health["status"] = "degraded"
+        health["redis"] = f"unhealthy: {str(e)}"
+
+    return health
 
 
 if __name__ == "__main__":

@@ -30,9 +30,14 @@ class DocumentIntelligenceService:
             )
             result = poller.result()
 
+            # Extract text PAGE BY PAGE — limit to MAX_UPLOAD_PAGES
             page_texts = []
+
             if hasattr(result, 'pages'):
                 for page in result.pages:
+                    if page.page_number > config.MAX_UPLOAD_PAGES:
+                        print(f"   ⚠️  Stopping at page {config.MAX_UPLOAD_PAGES} (MAX_UPLOAD_PAGES limit)")
+                        break
                     page_num = page.page_number
                     page_content = ""
                     if hasattr(page, 'lines'):

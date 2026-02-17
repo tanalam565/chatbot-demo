@@ -53,8 +53,9 @@ SESSION_TTL_SECONDS = int(os.getenv("SESSION_TTL_SECONDS", "7200"))  # 2 hours
 MAX_CONVERSATION_TURNS = int(os.getenv("MAX_CONVERSATION_TURNS", "10"))
 
 # File Upload Limits
-MAX_FILE_SIZE_MB = int(os.getenv("MAX_FILE_SIZE_MB", "50"))
+MAX_FILE_SIZE_MB = int(os.getenv("MAX_FILE_SIZE_MB", "15"))
 MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024
+MAX_UPLOAD_PAGES = int(os.getenv("MAX_UPLOAD_PAGES", "15"))
 
 # Rate Limiting
 RATE_LIMIT_CHAT = os.getenv("RATE_LIMIT_CHAT", "20/minute")
@@ -62,3 +63,9 @@ RATE_LIMIT_UPLOAD = os.getenv("RATE_LIMIT_UPLOAD", "5/minute")
 
 # Request Timeouts
 REQUEST_TIMEOUT_SECONDS = int(os.getenv("REQUEST_TIMEOUT_SECONDS", "60"))
+
+# CORS - comma-separated list of allowed origins
+CORS_ALLOWED_ORIGINS = os.getenv(
+    "CORS_ALLOWED_ORIGINS",
+    "http://localhost:3000,https://fluffy-spoon-pj7rwgw4566xc7477-3000.app.github.dev"
+).split(",")
