@@ -1,0 +1,725 @@
+INFO:     Started server process [8231]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+✓ Embedding service initialized:
+  Model: text-embedding-3-large
+  Deployment: text-embedding-3-large
+  Dimensions: 3072
+✓ Connected to index: azureblob-index-yotta (Hybrid Search enabled)
+✓ Max chunks per document: 7
+INFO:     50.172.237.10:0 - "OPTIONS /api/chat HTTP/1.1" 200 OK
+
+============================================================
+📨 Chat Request
+Session ID: session-1770918195208-ny1v7h0e9
+Query: Move out procedures
+Active sessions: []
+============================================================
+
+📤 No uploaded documents in this session
+
+💬 Query Type: Document query
+
+🔍 Searching company documents...
+
+======================================================================
+🔍 Hybrid search for: 'Move out procedures'
+📊 Target results: 15
+📄 Max chunks per document: 7
+======================================================================
+
+📥 Processing search results with per-document limiting...
+
+📊 Retrieval Statistics:
+   ✓ Total unique documents: 3
+   ✓ Total chunks retrieved: 15
+
+📄 Chunks per document:
+   ⚠️ LIMITED M_ADARA_COMMUNITYPOLICIES_0f4b5270-05d7-4c94-b14a-ba5c76c60e91_ee8e1d21-fd8f-4840-b062-0a8e5dc43271.pdf: 7 chunks
+   ⚠️ LIMITED MOVEOUT_1a449f52-a9b2-464b-b59d-81bd9a1296d4_5de12421-dd74-44af-9df2-0d3496d2908f.pdf: 7 chunks
+   ✓ Adara+Team+Member+Handbook+V.092020_0e180c71-a30e-4b77-b1c0-929224e06da4.pdf: 1 chunks
+======================================================================
+
+📁 Found 15 company documents
+  1. M_ADARA_COMMUNITYPOLICIES_0f4b5270-05d7-4c94-b14a-ba5c76c60e91_ee8e1d21-fd8f-4840-b062-0a8e5dc43271.pdf
+  2. MOVEOUT_1a449f52-a9b2-464b-b59d-81bd9a1296d4_5de12421-dd74-44af-9df2-0d3496d2908f.pdf
+  3. MOVEOUT_1a449f52-a9b2-464b-b59d-81bd9a1296d4_5de12421-dd74-44af-9df2-0d3496d2908f.pdf
+  4. M_ADARA_COMMUNITYPOLICIES_0f4b5270-05d7-4c94-b14a-ba5c76c60e91_ee8e1d21-fd8f-4840-b062-0a8e5dc43271.pdf
+  5. MOVEOUT_1a449f52-a9b2-464b-b59d-81bd9a1296d4_5de12421-dd74-44af-9df2-0d3496d2908f.pdf
+  6. MOVEOUT_1a449f52-a9b2-464b-b59d-81bd9a1296d4_5de12421-dd74-44af-9df2-0d3496d2908f.pdf
+  7. MOVEOUT_1a449f52-a9b2-464b-b59d-81bd9a1296d4_5de12421-dd74-44af-9df2-0d3496d2908f.pdf
+  8. MOVEOUT_1a449f52-a9b2-464b-b59d-81bd9a1296d4_5de12421-dd74-44af-9df2-0d3496d2908f.pdf
+  9. MOVEOUT_1a449f52-a9b2-464b-b59d-81bd9a1296d4_5de12421-dd74-44af-9df2-0d3496d2908f.pdf
+  10. M_ADARA_COMMUNITYPOLICIES_0f4b5270-05d7-4c94-b14a-ba5c76c60e91_ee8e1d21-fd8f-4840-b062-0a8e5dc43271.pdf
+  11. Adara+Team+Member+Handbook+V.092020_0e180c71-a30e-4b77-b1c0-929224e06da4.pdf
+  12. M_ADARA_COMMUNITYPOLICIES_0f4b5270-05d7-4c94-b14a-ba5c76c60e91_ee8e1d21-fd8f-4840-b062-0a8e5dc43271.pdf
+  13. M_ADARA_COMMUNITYPOLICIES_0f4b5270-05d7-4c94-b14a-ba5c76c60e91_ee8e1d21-fd8f-4840-b062-0a8e5dc43271.pdf
+  14. M_ADARA_COMMUNITYPOLICIES_0f4b5270-05d7-4c94-b14a-ba5c76c60e91_ee8e1d21-fd8f-4840-b062-0a8e5dc43271.pdf
+  15. M_ADARA_COMMUNITYPOLICIES_0f4b5270-05d7-4c94-b14a-ba5c76c60e91_ee8e1d21-fd8f-4840-b062-0a8e5dc43271.pdf
+
+📋 CONTEXT FOR LLM: 15 company documents
+
+📤 SENDING TO LLM (15 document pages):
+  1. 📁 [company] M_ADARA_COMMUNITYPOLICIES_0f4b5270-05d7-4c94-b14a-ba5c76c60e91_ee8e1d21-fd8f-4840-b062-0a8e5dc43271.pdf - Page 10
+      Content length: 964 chars
+  2. 📁 [company] MOVEOUT_1a449f52-a9b2-464b-b59d-81bd9a1296d4_5de12421-dd74-44af-9df2-0d3496d2908f.pdf - Page 1
+      Content length: 993 chars
+  3. 📁 [company] MOVEOUT_1a449f52-a9b2-464b-b59d-81bd9a1296d4_5de12421-dd74-44af-9df2-0d3496d2908f.pdf - Page 1
+      Content length: 1000 chars
+  4. 📁 [company] M_ADARA_COMMUNITYPOLICIES_0f4b5270-05d7-4c94-b14a-ba5c76c60e91_ee8e1d21-fd8f-4840-b062-0a8e5dc43271.pdf - Page 10
+      Content length: 885 chars
+  5. 📁 [company] MOVEOUT_1a449f52-a9b2-464b-b59d-81bd9a1296d4_5de12421-dd74-44af-9df2-0d3496d2908f.pdf - Page 1
+      Content length: 846 chars
+  6. 📁 [company] MOVEOUT_1a449f52-a9b2-464b-b59d-81bd9a1296d4_5de12421-dd74-44af-9df2-0d3496d2908f.pdf - Page 1
+      Content length: 984 chars
+  7. 📁 [company] MOVEOUT_1a449f52-a9b2-464b-b59d-81bd9a1296d4_5de12421-dd74-44af-9df2-0d3496d2908f.pdf - Page 1
+      Content length: 967 chars
+  8. 📁 [company] MOVEOUT_1a449f52-a9b2-464b-b59d-81bd9a1296d4_5de12421-dd74-44af-9df2-0d3496d2908f.pdf - Page 1
+      Content length: 982 chars
+  9. 📁 [company] MOVEOUT_1a449f52-a9b2-464b-b59d-81bd9a1296d4_5de12421-dd74-44af-9df2-0d3496d2908f.pdf - Page 1
+      Content length: 933 chars
+  10. 📁 [company] M_ADARA_COMMUNITYPOLICIES_0f4b5270-05d7-4c94-b14a-ba5c76c60e91_ee8e1d21-fd8f-4840-b062-0a8e5dc43271.pdf - Page 10
+      Content length: 984 chars
+  11. 📁 [company] Adara+Team+Member+Handbook+V.092020_0e180c71-a30e-4b77-b1c0-929224e06da4.pdf - Page 53
+      Content length: 957 chars
+  12. 📁 [company] M_ADARA_COMMUNITYPOLICIES_0f4b5270-05d7-4c94-b14a-ba5c76c60e91_ee8e1d21-fd8f-4840-b062-0a8e5dc43271.pdf - Page 11
+      Content length: 972 chars
+  13. 📁 [company] M_ADARA_COMMUNITYPOLICIES_0f4b5270-05d7-4c94-b14a-ba5c76c60e91_ee8e1d21-fd8f-4840-b062-0a8e5dc43271.pdf - Page 4
+      Content length: 869 chars
+  14. 📁 [company] M_ADARA_COMMUNITYPOLICIES_0f4b5270-05d7-4c94-b14a-ba5c76c60e91_ee8e1d21-fd8f-4840-b062-0a8e5dc43271.pdf - Page 9
+      Content length: 898 chars
+  15. 📁 [company] M_ADARA_COMMUNITYPOLICIES_0f4b5270-05d7-4c94-b14a-ba5c76c60e91_ee8e1d21-fd8f-4840-b062-0a8e5dc43271.pdf - Page 10
+      Content length: 966 chars
+============================================================
+
+📊 Prompt Statistics:
+   Total prompt: 16,637 chars (~4,159 tokens)
+   Uploaded content: 0 chars (FULL, no truncation)
+   Company content: 14,200 chars
+   Context window available: ~128,000 tokens
+   Usage: 3.2%
+   Documents provided: 15
+📝 Including 0 previous exchanges in context
+✅ Generated response with inline citations
+   Documents provided: 15
+   Unique documents cited: 2
+     [1] 📁 M_ADARA_COMMUNITYPOLICIES_0f4b5270-05d7-4c94-b14a-ba5c76c60e91_ee8e1d21-fd8f-4840-b062-0a8e5dc43271.pdf
+     [2] 📁 MOVEOUT_1a449f52-a9b2-464b-b59d-81bd9a1296d4_5de12421-dd74-44af-9df2-0d3496d2908f.pdf
+
+📋 Sources after deduplication: 2
+  1. 📁 📁 M_ADARA_COMMUNITYPOLICIES_0f4b5270-05d7-4c94-b14a-ba5c76c60e91_ee8e1d21-fd8f-4840-b062-0a8e5dc43271.pdf
+  2. 📁 📁 MOVEOUT_1a449f52-a9b2-464b-b59d-81bd9a1296d4_5de12421-dd74-44af-9df2-0d3496d2908f.pdf
+INFO:     50.172.237.10:0 - "POST /api/chat HTTP/1.1" 200 OK
+INFO:     50.172.237.10:0 - "OPTIONS /api/chat HTTP/1.1" 200 OK
+
+============================================================
+📨 Chat Request
+Session ID: session-1770919368638-wqr7zjizr
+Query: Moveout policies
+Active sessions: []
+============================================================
+
+📤 No uploaded documents in this session
+
+💬 Query Type: Document query
+
+🔍 Searching company documents...
+
+======================================================================
+🔍 Hybrid search for: 'Moveout policies'
+📊 Target results: 15
+📄 Max chunks per document: 7
+======================================================================
+
+📥 Processing search results with per-document limiting...
+
+📊 Retrieval Statistics:
+   ✓ Total unique documents: 3
+   ✓ Total chunks retrieved: 15
+
+📄 Chunks per document:
+   ⚠️ LIMITED Adara+Team+Member+Handbook+V.092020_0e180c71-a30e-4b77-b1c0-929224e06da4.pdf: 7 chunks
+   ⚠️ LIMITED M_ADARA_COMMUNITYPOLICIES_0f4b5270-05d7-4c94-b14a-ba5c76c60e91_ee8e1d21-fd8f-4840-b062-0a8e5dc43271.pdf: 7 chunks
+   ✓ MOVEOUT_1a449f52-a9b2-464b-b59d-81bd9a1296d4_5de12421-dd74-44af-9df2-0d3496d2908f.pdf: 1 chunks
+======================================================================
+
+📁 Found 15 company documents
+  1. Adara+Team+Member+Handbook+V.092020_0e180c71-a30e-4b77-b1c0-929224e06da4.pdf
+  2. Adara+Team+Member+Handbook+V.092020_0e180c71-a30e-4b77-b1c0-929224e06da4.pdf
+  3. M_ADARA_COMMUNITYPOLICIES_0f4b5270-05d7-4c94-b14a-ba5c76c60e91_ee8e1d21-fd8f-4840-b062-0a8e5dc43271.pdf
+  4. M_ADARA_COMMUNITYPOLICIES_0f4b5270-05d7-4c94-b14a-ba5c76c60e91_ee8e1d21-fd8f-4840-b062-0a8e5dc43271.pdf
+  5. M_ADARA_COMMUNITYPOLICIES_0f4b5270-05d7-4c94-b14a-ba5c76c60e91_ee8e1d21-fd8f-4840-b062-0a8e5dc43271.pdf
+  6. M_ADARA_COMMUNITYPOLICIES_0f4b5270-05d7-4c94-b14a-ba5c76c60e91_ee8e1d21-fd8f-4840-b062-0a8e5dc43271.pdf
+  7. M_ADARA_COMMUNITYPOLICIES_0f4b5270-05d7-4c94-b14a-ba5c76c60e91_ee8e1d21-fd8f-4840-b062-0a8e5dc43271.pdf
+  8. M_ADARA_COMMUNITYPOLICIES_0f4b5270-05d7-4c94-b14a-ba5c76c60e91_ee8e1d21-fd8f-4840-b062-0a8e5dc43271.pdf
+  9. M_ADARA_COMMUNITYPOLICIES_0f4b5270-05d7-4c94-b14a-ba5c76c60e91_ee8e1d21-fd8f-4840-b062-0a8e5dc43271.pdf
+  10. Adara+Team+Member+Handbook+V.092020_0e180c71-a30e-4b77-b1c0-929224e06da4.pdf
+  11. Adara+Team+Member+Handbook+V.092020_0e180c71-a30e-4b77-b1c0-929224e06da4.pdf
+  12. Adara+Team+Member+Handbook+V.092020_0e180c71-a30e-4b77-b1c0-929224e06da4.pdf
+  13. Adara+Team+Member+Handbook+V.092020_0e180c71-a30e-4b77-b1c0-929224e06da4.pdf
+  14. MOVEOUT_1a449f52-a9b2-464b-b59d-81bd9a1296d4_5de12421-dd74-44af-9df2-0d3496d2908f.pdf
+  15. Adara+Team+Member+Handbook+V.092020_0e180c71-a30e-4b77-b1c0-929224e06da4.pdf
+
+📋 CONTEXT FOR LLM: 15 company documents
+
+📤 SENDING TO LLM (15 document pages):
+  1. 📁 [company] Adara+Team+Member+Handbook+V.092020_0e180c71-a30e-4b77-b1c0-929224e06da4.pdf - Page 53
+      Content length: 972 chars
+  2. 📁 [company] Adara+Team+Member+Handbook+V.092020_0e180c71-a30e-4b77-b1c0-929224e06da4.pdf - Page 53
+      Content length: 854 chars
+  3. 📁 [company] M_ADARA_COMMUNITYPOLICIES_0f4b5270-05d7-4c94-b14a-ba5c76c60e91_ee8e1d21-fd8f-4840-b062-0a8e5dc43271.pdf - Page 11
+      Content length: 854 chars
+  4. 📁 [company] M_ADARA_COMMUNITYPOLICIES_0f4b5270-05d7-4c94-b14a-ba5c76c60e91_ee8e1d21-fd8f-4840-b062-0a8e5dc43271.pdf - Page 4
+      Content length: 938 chars
+  5. 📁 [company] M_ADARA_COMMUNITYPOLICIES_0f4b5270-05d7-4c94-b14a-ba5c76c60e91_ee8e1d21-fd8f-4840-b062-0a8e5dc43271.pdf - Page 10
+      Content length: 855 chars
+  6. 📁 [company] M_ADARA_COMMUNITYPOLICIES_0f4b5270-05d7-4c94-b14a-ba5c76c60e91_ee8e1d21-fd8f-4840-b062-0a8e5dc43271.pdf - Page 1
+      Content length: 970 chars
+  7. 📁 [company] M_ADARA_COMMUNITYPOLICIES_0f4b5270-05d7-4c94-b14a-ba5c76c60e91_ee8e1d21-fd8f-4840-b062-0a8e5dc43271.pdf - Page 6
+      Content length: 940 chars
+  8. 📁 [company] M_ADARA_COMMUNITYPOLICIES_0f4b5270-05d7-4c94-b14a-ba5c76c60e91_ee8e1d21-fd8f-4840-b062-0a8e5dc43271.pdf - Page 4
+      Content length: 957 chars
+  9. 📁 [company] M_ADARA_COMMUNITYPOLICIES_0f4b5270-05d7-4c94-b14a-ba5c76c60e91_ee8e1d21-fd8f-4840-b062-0a8e5dc43271.pdf - Page 10
+      Content length: 984 chars
+  10. 📁 [company] Adara+Team+Member+Handbook+V.092020_0e180c71-a30e-4b77-b1c0-929224e06da4.pdf - Page 53
+      Content length: 878 chars
+  11. 📁 [company] Adara+Team+Member+Handbook+V.092020_0e180c71-a30e-4b77-b1c0-929224e06da4.pdf - Page 46
+      Content length: 803 chars
+  12. 📁 [company] Adara+Team+Member+Handbook+V.092020_0e180c71-a30e-4b77-b1c0-929224e06da4.pdf - Page 46
+      Content length: 982 chars
+  13. 📁 [company] Adara+Team+Member+Handbook+V.092020_0e180c71-a30e-4b77-b1c0-929224e06da4.pdf - Page 10
+      Content length: 996 chars
+  14. 📁 [company] MOVEOUT_1a449f52-a9b2-464b-b59d-81bd9a1296d4_5de12421-dd74-44af-9df2-0d3496d2908f.pdf - Page 1
+      Content length: 967 chars
+  15. 📁 [company] Adara+Team+Member+Handbook+V.092020_0e180c71-a30e-4b77-b1c0-929224e06da4.pdf - Page 10
+      Content length: 994 chars
+============================================================
+
+📊 Prompt Statistics:
+   Total prompt: 16,332 chars (~4,083 tokens)
+   Uploaded content: 0 chars (FULL, no truncation)
+   Company content: 13,944 chars
+   Context window available: ~128,000 tokens
+   Usage: 3.2%
+   Documents provided: 15
+📝 Including 0 previous exchanges in context
+✅ Generated response with inline citations
+   Documents provided: 15
+   Unique documents cited: 1
+     [1] 📁 MOVEOUT_1a449f52-a9b2-464b-b59d-81bd9a1296d4_5de12421-dd74-44af-9df2-0d3496d2908f.pdf
+
+📋 Sources after deduplication: 1
+  1. 📁 📁 MOVEOUT_1a449f52-a9b2-464b-b59d-81bd9a1296d4_5de12421-dd74-44af-9df2-0d3496d2908f.pdf
+INFO:     50.172.237.10:0 - "POST /api/chat HTTP/1.1" 200 OK
+INFO:     50.172.237.10:0 - "OPTIONS /api/chat HTTP/1.1" 200 OK
+
+============================================================
+📨 Chat Request
+Session ID: session-1770920413363-0973x187r
+Query: Is the remote policy says to pay $300?
+Active sessions: []
+============================================================
+
+📤 No uploaded documents in this session
+
+💬 Query Type: Document query
+
+🔍 Searching company documents...
+
+======================================================================
+🔍 Hybrid search for: 'Is the remote policy says to pay $300?'
+📊 Target results: 15
+📄 Max chunks per document: 7
+======================================================================
+
+📥 Processing search results with per-document limiting...
+
+📊 Retrieval Statistics:
+   ✓ Total unique documents: 4
+   ✓ Total chunks retrieved: 15
+
+📄 Chunks per document:
+   ⚠️ LIMITED M_ADARA_COMMUNITYPOLICIES_0f4b5270-05d7-4c94-b14a-ba5c76c60e91_ee8e1d21-fd8f-4840-b062-0a8e5dc43271.pdf: 7 chunks
+   ✓ Adara+Team+Member+Handbook+V.092020_0e180c71-a30e-4b77-b1c0-929224e06da4.pdf: 6 chunks
+   ✓ Adara+Communities%2c+Customer+Service+Policy+17_ec1029b7-949a-49ad-8031-73292faedb27.pdf: 1 chunks
+   ✓ Team+Member+On-Call+Agreement_9af5caa6-e047-4fcf-8dfa-1a52a2608d8f.pdf: 1 chunks
+======================================================================
+
+📁 Found 15 company documents
+  1. M_ADARA_COMMUNITYPOLICIES_0f4b5270-05d7-4c94-b14a-ba5c76c60e91_ee8e1d21-fd8f-4840-b062-0a8e5dc43271.pdf
+  2. Adara+Team+Member+Handbook+V.092020_0e180c71-a30e-4b77-b1c0-929224e06da4.pdf
+  3. Adara+Team+Member+Handbook+V.092020_0e180c71-a30e-4b77-b1c0-929224e06da4.pdf
+  4. M_ADARA_COMMUNITYPOLICIES_0f4b5270-05d7-4c94-b14a-ba5c76c60e91_ee8e1d21-fd8f-4840-b062-0a8e5dc43271.pdf
+  5. M_ADARA_COMMUNITYPOLICIES_0f4b5270-05d7-4c94-b14a-ba5c76c60e91_ee8e1d21-fd8f-4840-b062-0a8e5dc43271.pdf
+  6. M_ADARA_COMMUNITYPOLICIES_0f4b5270-05d7-4c94-b14a-ba5c76c60e91_ee8e1d21-fd8f-4840-b062-0a8e5dc43271.pdf
+  7. M_ADARA_COMMUNITYPOLICIES_0f4b5270-05d7-4c94-b14a-ba5c76c60e91_ee8e1d21-fd8f-4840-b062-0a8e5dc43271.pdf
+  8. M_ADARA_COMMUNITYPOLICIES_0f4b5270-05d7-4c94-b14a-ba5c76c60e91_ee8e1d21-fd8f-4840-b062-0a8e5dc43271.pdf
+  9. Adara+Communities%2c+Customer+Service+Policy+17_ec1029b7-949a-49ad-8031-73292faedb27.pdf
+  10. Adara+Team+Member+Handbook+V.092020_0e180c71-a30e-4b77-b1c0-929224e06da4.pdf
+  11. M_ADARA_COMMUNITYPOLICIES_0f4b5270-05d7-4c94-b14a-ba5c76c60e91_ee8e1d21-fd8f-4840-b062-0a8e5dc43271.pdf
+  12. Team+Member+On-Call+Agreement_9af5caa6-e047-4fcf-8dfa-1a52a2608d8f.pdf
+  13. Adara+Team+Member+Handbook+V.092020_0e180c71-a30e-4b77-b1c0-929224e06da4.pdf
+  14. Adara+Team+Member+Handbook+V.092020_0e180c71-a30e-4b77-b1c0-929224e06da4.pdf
+  15. Adara+Team+Member+Handbook+V.092020_0e180c71-a30e-4b77-b1c0-929224e06da4.pdf
+
+📋 CONTEXT FOR LLM: 15 company documents
+
+📤 SENDING TO LLM (15 document pages):
+  1. 📁 [company] M_ADARA_COMMUNITYPOLICIES_0f4b5270-05d7-4c94-b14a-ba5c76c60e91_ee8e1d21-fd8f-4840-b062-0a8e5dc43271.pdf - Page 2
+      Content length: 971 chars
+  2. 📁 [company] Adara+Team+Member+Handbook+V.092020_0e180c71-a30e-4b77-b1c0-929224e06da4.pdf - Page 32
+      Content length: 950 chars
+  3. 📁 [company] Adara+Team+Member+Handbook+V.092020_0e180c71-a30e-4b77-b1c0-929224e06da4.pdf - Page 32
+      Content length: 912 chars
+  4. 📁 [company] M_ADARA_COMMUNITYPOLICIES_0f4b5270-05d7-4c94-b14a-ba5c76c60e91_ee8e1d21-fd8f-4840-b062-0a8e5dc43271.pdf - Page 10
+      Content length: 964 chars
+  5. 📁 [company] M_ADARA_COMMUNITYPOLICIES_0f4b5270-05d7-4c94-b14a-ba5c76c60e91_ee8e1d21-fd8f-4840-b062-0a8e5dc43271.pdf - Page 2
+      Content length: 954 chars
+  6. 📁 [company] M_ADARA_COMMUNITYPOLICIES_0f4b5270-05d7-4c94-b14a-ba5c76c60e91_ee8e1d21-fd8f-4840-b062-0a8e5dc43271.pdf - Page 3
+      Content length: 965 chars
+  7. 📁 [company] M_ADARA_COMMUNITYPOLICIES_0f4b5270-05d7-4c94-b14a-ba5c76c60e91_ee8e1d21-fd8f-4840-b062-0a8e5dc43271.pdf - Page 3
+      Content length: 966 chars
+  8. 📁 [company] M_ADARA_COMMUNITYPOLICIES_0f4b5270-05d7-4c94-b14a-ba5c76c60e91_ee8e1d21-fd8f-4840-b062-0a8e5dc43271.pdf - Page 3
+      Content length: 949 chars
+  9. 📁 [company] Adara+Communities%2c+Customer+Service+Policy+17_ec1029b7-949a-49ad-8031-73292faedb27.pdf - Page 7
+      Content length: 996 chars
+  10. 📁 [company] Adara+Team+Member+Handbook+V.092020_0e180c71-a30e-4b77-b1c0-929224e06da4.pdf - Page 30
+      Content length: 834 chars
+  11. 📁 [company] M_ADARA_COMMUNITYPOLICIES_0f4b5270-05d7-4c94-b14a-ba5c76c60e91_ee8e1d21-fd8f-4840-b062-0a8e5dc43271.pdf - Page 3
+      Content length: 932 chars
+  12. 📁 [company] Team+Member+On-Call+Agreement_9af5caa6-e047-4fcf-8dfa-1a52a2608d8f.pdf - Page 1
+      Content length: 833 chars
+  13. 📁 [company] Adara+Team+Member+Handbook+V.092020_0e180c71-a30e-4b77-b1c0-929224e06da4.pdf - Page 53
+      Content length: 995 chars
+  14. 📁 [company] Adara+Team+Member+Handbook+V.092020_0e180c71-a30e-4b77-b1c0-929224e06da4.pdf - Page 53
+      Content length: 957 chars
+  15. 📁 [company] Adara+Team+Member+Handbook+V.092020_0e180c71-a30e-4b77-b1c0-929224e06da4.pdf - Page 33
+      Content length: 952 chars
+============================================================
+
+📊 Prompt Statistics:
+   Total prompt: 16,531 chars (~4,132 tokens)
+   Uploaded content: 0 chars (FULL, no truncation)
+   Company content: 14,130 chars
+   Context window available: ~128,000 tokens
+   Usage: 3.2%
+   Documents provided: 15
+📝 Including 0 previous exchanges in context
+✅ Generated response with inline citations
+   Documents provided: 15
+   Unique documents cited: 1
+     [1] 📁 M_ADARA_COMMUNITYPOLICIES_0f4b5270-05d7-4c94-b14a-ba5c76c60e91_ee8e1d21-fd8f-4840-b062-0a8e5dc43271.pdf
+
+📋 Sources after deduplication: 1
+  1. 📁 📁 M_ADARA_COMMUNITYPOLICIES_0f4b5270-05d7-4c94-b14a-ba5c76c60e91_ee8e1d21-fd8f-4840-b062-0a8e5dc43271.pdf
+INFO:     50.172.237.10:0 - "POST /api/chat HTTP/1.1" 200 OK
+
+============================================================
+📨 Chat Request
+Session ID: session-1770920413363-0973x187r
+Query: What if doors are locked by mistake is it free repairs?
+Active sessions: []
+============================================================
+
+📤 No uploaded documents in this session
+
+💬 Query Type: Document query
+
+🔍 Searching company documents...
+
+======================================================================
+🔍 Hybrid search for: 'What if doors are locked by mistake is it free repairs?'
+📊 Target results: 15
+📄 Max chunks per document: 7
+======================================================================
+
+📥 Processing search results with per-document limiting...
+
+📊 Retrieval Statistics:
+   ✓ Total unique documents: 3
+   ✓ Total chunks retrieved: 15
+
+📄 Chunks per document:
+   ⚠️ LIMITED M_ADARA_COMMUNITYPOLICIES_0f4b5270-05d7-4c94-b14a-ba5c76c60e91_ee8e1d21-fd8f-4840-b062-0a8e5dc43271.pdf: 7 chunks
+   ✓ SECURITY_60311429-9a1f-4ac4-95fc-02c9cbec39f3_4cf3472e-ccd6-4ea2-b4e4-cd1e5a5bd311.pdf: 2 chunks
+   ✓ Adara+Team+Member+Handbook+V.092020_0e180c71-a30e-4b77-b1c0-929224e06da4.pdf: 6 chunks
+======================================================================
+
+📁 Found 15 company documents
+  1. M_ADARA_COMMUNITYPOLICIES_0f4b5270-05d7-4c94-b14a-ba5c76c60e91_ee8e1d21-fd8f-4840-b062-0a8e5dc43271.pdf
+  2. SECURITY_60311429-9a1f-4ac4-95fc-02c9cbec39f3_4cf3472e-ccd6-4ea2-b4e4-cd1e5a5bd311.pdf
+  3. M_ADARA_COMMUNITYPOLICIES_0f4b5270-05d7-4c94-b14a-ba5c76c60e91_ee8e1d21-fd8f-4840-b062-0a8e5dc43271.pdf
+  4. M_ADARA_COMMUNITYPOLICIES_0f4b5270-05d7-4c94-b14a-ba5c76c60e91_ee8e1d21-fd8f-4840-b062-0a8e5dc43271.pdf
+  5. M_ADARA_COMMUNITYPOLICIES_0f4b5270-05d7-4c94-b14a-ba5c76c60e91_ee8e1d21-fd8f-4840-b062-0a8e5dc43271.pdf
+  6. M_ADARA_COMMUNITYPOLICIES_0f4b5270-05d7-4c94-b14a-ba5c76c60e91_ee8e1d21-fd8f-4840-b062-0a8e5dc43271.pdf
+  7. M_ADARA_COMMUNITYPOLICIES_0f4b5270-05d7-4c94-b14a-ba5c76c60e91_ee8e1d21-fd8f-4840-b062-0a8e5dc43271.pdf
+  8. M_ADARA_COMMUNITYPOLICIES_0f4b5270-05d7-4c94-b14a-ba5c76c60e91_ee8e1d21-fd8f-4840-b062-0a8e5dc43271.pdf
+  9. SECURITY_60311429-9a1f-4ac4-95fc-02c9cbec39f3_4cf3472e-ccd6-4ea2-b4e4-cd1e5a5bd311.pdf
+  10. Adara+Team+Member+Handbook+V.092020_0e180c71-a30e-4b77-b1c0-929224e06da4.pdf
+  11. Adara+Team+Member+Handbook+V.092020_0e180c71-a30e-4b77-b1c0-929224e06da4.pdf
+  12. Adara+Team+Member+Handbook+V.092020_0e180c71-a30e-4b77-b1c0-929224e06da4.pdf
+  13. Adara+Team+Member+Handbook+V.092020_0e180c71-a30e-4b77-b1c0-929224e06da4.pdf
+  14. Adara+Team+Member+Handbook+V.092020_0e180c71-a30e-4b77-b1c0-929224e06da4.pdf
+  15. Adara+Team+Member+Handbook+V.092020_0e180c71-a30e-4b77-b1c0-929224e06da4.pdf
+
+📋 CONTEXT FOR LLM: 15 company documents
+
+📤 SENDING TO LLM (15 document pages):
+  1. 📁 [company] M_ADARA_COMMUNITYPOLICIES_0f4b5270-05d7-4c94-b14a-ba5c76c60e91_ee8e1d21-fd8f-4840-b062-0a8e5dc43271.pdf - Page 3
+      Content length: 917 chars
+  2. 📁 [company] SECURITY_60311429-9a1f-4ac4-95fc-02c9cbec39f3_4cf3472e-ccd6-4ea2-b4e4-cd1e5a5bd311.pdf - Page 1
+      Content length: 979 chars
+  3. 📁 [company] M_ADARA_COMMUNITYPOLICIES_0f4b5270-05d7-4c94-b14a-ba5c76c60e91_ee8e1d21-fd8f-4840-b062-0a8e5dc43271.pdf - Page 1
+      Content length: 869 chars
+  4. 📁 [company] M_ADARA_COMMUNITYPOLICIES_0f4b5270-05d7-4c94-b14a-ba5c76c60e91_ee8e1d21-fd8f-4840-b062-0a8e5dc43271.pdf - Page 1
+      Content length: 958 chars
+  5. 📁 [company] M_ADARA_COMMUNITYPOLICIES_0f4b5270-05d7-4c94-b14a-ba5c76c60e91_ee8e1d21-fd8f-4840-b062-0a8e5dc43271.pdf - Page 1
+      Content length: 973 chars
+  6. 📁 [company] M_ADARA_COMMUNITYPOLICIES_0f4b5270-05d7-4c94-b14a-ba5c76c60e91_ee8e1d21-fd8f-4840-b062-0a8e5dc43271.pdf - Page 1
+      Content length: 923 chars
+  7. 📁 [company] M_ADARA_COMMUNITYPOLICIES_0f4b5270-05d7-4c94-b14a-ba5c76c60e91_ee8e1d21-fd8f-4840-b062-0a8e5dc43271.pdf - Page 3
+      Content length: 890 chars
+  8. 📁 [company] M_ADARA_COMMUNITYPOLICIES_0f4b5270-05d7-4c94-b14a-ba5c76c60e91_ee8e1d21-fd8f-4840-b062-0a8e5dc43271.pdf - Page 3
+      Content length: 966 chars
+  9. 📁 [company] SECURITY_60311429-9a1f-4ac4-95fc-02c9cbec39f3_4cf3472e-ccd6-4ea2-b4e4-cd1e5a5bd311.pdf - Page 1
+      Content length: 918 chars
+  10. 📁 [company] Adara+Team+Member+Handbook+V.092020_0e180c71-a30e-4b77-b1c0-929224e06da4.pdf - Page 18
+      Content length: 918 chars
+  11. 📁 [company] Adara+Team+Member+Handbook+V.092020_0e180c71-a30e-4b77-b1c0-929224e06da4.pdf - Page 23
+      Content length: 919 chars
+  12. 📁 [company] Adara+Team+Member+Handbook+V.092020_0e180c71-a30e-4b77-b1c0-929224e06da4.pdf - Page 17
+      Content length: 932 chars
+  13. 📁 [company] Adara+Team+Member+Handbook+V.092020_0e180c71-a30e-4b77-b1c0-929224e06da4.pdf - Page 50
+      Content length: 863 chars
+  14. 📁 [company] Adara+Team+Member+Handbook+V.092020_0e180c71-a30e-4b77-b1c0-929224e06da4.pdf - Page 50
+      Content length: 841 chars
+  15. 📁 [company] Adara+Team+Member+Handbook+V.092020_0e180c71-a30e-4b77-b1c0-929224e06da4.pdf - Page 28
+      Content length: 971 chars
+============================================================
+
+📊 Prompt Statistics:
+   Total prompt: 16,267 chars (~4,066 tokens)
+   Uploaded content: 0 chars (FULL, no truncation)
+   Company content: 13,837 chars
+   Context window available: ~128,000 tokens
+   Usage: 3.2%
+   Documents provided: 15
+📝 Including 1 previous exchanges in context
+✅ Generated response with inline citations
+   Documents provided: 15
+   Unique documents cited: 1
+     [1] 📁 M_ADARA_COMMUNITYPOLICIES_0f4b5270-05d7-4c94-b14a-ba5c76c60e91_ee8e1d21-fd8f-4840-b062-0a8e5dc43271.pdf
+
+📋 Sources after deduplication: 1
+  1. 📁 📁 M_ADARA_COMMUNITYPOLICIES_0f4b5270-05d7-4c94-b14a-ba5c76c60e91_ee8e1d21-fd8f-4840-b062-0a8e5dc43271.pdf
+INFO:     50.172.237.10:0 - "POST /api/chat HTTP/1.1" 200 OK
+
+============================================================
+📨 Chat Request
+Session ID: session-1770920413363-0973x187r
+Query: so what about door lock not working?
+Active sessions: []
+============================================================
+
+📤 No uploaded documents in this session
+
+💬 Query Type: Document query
+
+🔍 Searching company documents...
+
+======================================================================
+🔍 Hybrid search for: 'so what about door lock not working?'
+📊 Target results: 15
+📄 Max chunks per document: 7
+======================================================================
+
+📥 Processing search results with per-document limiting...
+
+📊 Retrieval Statistics:
+   ✓ Total unique documents: 3
+   ✓ Total chunks retrieved: 15
+
+📄 Chunks per document:
+   ⚠️ LIMITED M_ADARA_COMMUNITYPOLICIES_0f4b5270-05d7-4c94-b14a-ba5c76c60e91_ee8e1d21-fd8f-4840-b062-0a8e5dc43271.pdf: 7 chunks
+   ✓ SECURITY_60311429-9a1f-4ac4-95fc-02c9cbec39f3_4cf3472e-ccd6-4ea2-b4e4-cd1e5a5bd311.pdf: 2 chunks
+   ✓ Adara+Team+Member+Handbook+V.092020_0e180c71-a30e-4b77-b1c0-929224e06da4.pdf: 6 chunks
+======================================================================
+
+📁 Found 15 company documents
+  1. M_ADARA_COMMUNITYPOLICIES_0f4b5270-05d7-4c94-b14a-ba5c76c60e91_ee8e1d21-fd8f-4840-b062-0a8e5dc43271.pdf
+  2. M_ADARA_COMMUNITYPOLICIES_0f4b5270-05d7-4c94-b14a-ba5c76c60e91_ee8e1d21-fd8f-4840-b062-0a8e5dc43271.pdf
+  3. SECURITY_60311429-9a1f-4ac4-95fc-02c9cbec39f3_4cf3472e-ccd6-4ea2-b4e4-cd1e5a5bd311.pdf
+  4. M_ADARA_COMMUNITYPOLICIES_0f4b5270-05d7-4c94-b14a-ba5c76c60e91_ee8e1d21-fd8f-4840-b062-0a8e5dc43271.pdf
+  5. SECURITY_60311429-9a1f-4ac4-95fc-02c9cbec39f3_4cf3472e-ccd6-4ea2-b4e4-cd1e5a5bd311.pdf
+  6. M_ADARA_COMMUNITYPOLICIES_0f4b5270-05d7-4c94-b14a-ba5c76c60e91_ee8e1d21-fd8f-4840-b062-0a8e5dc43271.pdf
+  7. M_ADARA_COMMUNITYPOLICIES_0f4b5270-05d7-4c94-b14a-ba5c76c60e91_ee8e1d21-fd8f-4840-b062-0a8e5dc43271.pdf
+  8. M_ADARA_COMMUNITYPOLICIES_0f4b5270-05d7-4c94-b14a-ba5c76c60e91_ee8e1d21-fd8f-4840-b062-0a8e5dc43271.pdf
+  9. M_ADARA_COMMUNITYPOLICIES_0f4b5270-05d7-4c94-b14a-ba5c76c60e91_ee8e1d21-fd8f-4840-b062-0a8e5dc43271.pdf
+  10. Adara+Team+Member+Handbook+V.092020_0e180c71-a30e-4b77-b1c0-929224e06da4.pdf
+  11. Adara+Team+Member+Handbook+V.092020_0e180c71-a30e-4b77-b1c0-929224e06da4.pdf
+  12. Adara+Team+Member+Handbook+V.092020_0e180c71-a30e-4b77-b1c0-929224e06da4.pdf
+  13. Adara+Team+Member+Handbook+V.092020_0e180c71-a30e-4b77-b1c0-929224e06da4.pdf
+  14. Adara+Team+Member+Handbook+V.092020_0e180c71-a30e-4b77-b1c0-929224e06da4.pdf
+  15. Adara+Team+Member+Handbook+V.092020_0e180c71-a30e-4b77-b1c0-929224e06da4.pdf
+
+📋 CONTEXT FOR LLM: 15 company documents
+
+📤 SENDING TO LLM (15 document pages):
+  1. 📁 [company] M_ADARA_COMMUNITYPOLICIES_0f4b5270-05d7-4c94-b14a-ba5c76c60e91_ee8e1d21-fd8f-4840-b062-0a8e5dc43271.pdf - Page 1
+      Content length: 869 chars
+  2. 📁 [company] M_ADARA_COMMUNITYPOLICIES_0f4b5270-05d7-4c94-b14a-ba5c76c60e91_ee8e1d21-fd8f-4840-b062-0a8e5dc43271.pdf - Page 1
+      Content length: 973 chars
+  3. 📁 [company] SECURITY_60311429-9a1f-4ac4-95fc-02c9cbec39f3_4cf3472e-ccd6-4ea2-b4e4-cd1e5a5bd311.pdf - Page 1
+      Content length: 918 chars
+  4. 📁 [company] M_ADARA_COMMUNITYPOLICIES_0f4b5270-05d7-4c94-b14a-ba5c76c60e91_ee8e1d21-fd8f-4840-b062-0a8e5dc43271.pdf - Page 3
+      Content length: 917 chars
+  5. 📁 [company] SECURITY_60311429-9a1f-4ac4-95fc-02c9cbec39f3_4cf3472e-ccd6-4ea2-b4e4-cd1e5a5bd311.pdf - Page 1
+      Content length: 979 chars
+  6. 📁 [company] M_ADARA_COMMUNITYPOLICIES_0f4b5270-05d7-4c94-b14a-ba5c76c60e91_ee8e1d21-fd8f-4840-b062-0a8e5dc43271.pdf - Page 1
+      Content length: 965 chars
+  7. 📁 [company] M_ADARA_COMMUNITYPOLICIES_0f4b5270-05d7-4c94-b14a-ba5c76c60e91_ee8e1d21-fd8f-4840-b062-0a8e5dc43271.pdf - Page 3
+      Content length: 890 chars
+  8. 📁 [company] M_ADARA_COMMUNITYPOLICIES_0f4b5270-05d7-4c94-b14a-ba5c76c60e91_ee8e1d21-fd8f-4840-b062-0a8e5dc43271.pdf - Page 1
+      Content length: 923 chars
+  9. 📁 [company] M_ADARA_COMMUNITYPOLICIES_0f4b5270-05d7-4c94-b14a-ba5c76c60e91_ee8e1d21-fd8f-4840-b062-0a8e5dc43271.pdf - Page 1
+      Content length: 958 chars
+  10. 📁 [company] Adara+Team+Member+Handbook+V.092020_0e180c71-a30e-4b77-b1c0-929224e06da4.pdf - Page 50
+      Content length: 841 chars
+  11. 📁 [company] Adara+Team+Member+Handbook+V.092020_0e180c71-a30e-4b77-b1c0-929224e06da4.pdf - Page 50
+      Content length: 863 chars
+  12. 📁 [company] Adara+Team+Member+Handbook+V.092020_0e180c71-a30e-4b77-b1c0-929224e06da4.pdf - Page 27
+      Content length: 972 chars
+  13. 📁 [company] Adara+Team+Member+Handbook+V.092020_0e180c71-a30e-4b77-b1c0-929224e06da4.pdf - Page 18
+      Content length: 918 chars
+  14. 📁 [company] Adara+Team+Member+Handbook+V.092020_0e180c71-a30e-4b77-b1c0-929224e06da4.pdf - Page 22
+      Content length: 933 chars
+  15. 📁 [company] Adara+Team+Member+Handbook+V.092020_0e180c71-a30e-4b77-b1c0-929224e06da4.pdf - Page 17
+      Content length: 932 chars
+============================================================
+
+📊 Prompt Statistics:
+   Total prompt: 16,262 chars (~4,065 tokens)
+   Uploaded content: 0 chars (FULL, no truncation)
+   Company content: 13,851 chars
+   Context window available: ~128,000 tokens
+   Usage: 3.2%
+   Documents provided: 15
+📝 Including 2 previous exchanges in context
+✅ Generated response with inline citations
+   Documents provided: 15
+   Unique documents cited: 2
+     [1] 📁 M_ADARA_COMMUNITYPOLICIES_0f4b5270-05d7-4c94-b14a-ba5c76c60e91_ee8e1d21-fd8f-4840-b062-0a8e5dc43271.pdf
+     [2] 📁 SECURITY_60311429-9a1f-4ac4-95fc-02c9cbec39f3_4cf3472e-ccd6-4ea2-b4e4-cd1e5a5bd311.pdf
+
+📋 Sources after deduplication: 2
+  1. 📁 📁 M_ADARA_COMMUNITYPOLICIES_0f4b5270-05d7-4c94-b14a-ba5c76c60e91_ee8e1d21-fd8f-4840-b062-0a8e5dc43271.pdf
+  2. 📁 📁 SECURITY_60311429-9a1f-4ac4-95fc-02c9cbec39f3_4cf3472e-ccd6-4ea2-b4e4-cd1e5a5bd311.pdf
+INFO:     50.172.237.10:0 - "POST /api/chat HTTP/1.1" 200 OK
+INFO:     50.172.237.10:0 - "OPTIONS /api/chat HTTP/1.1" 200 OK
+
+============================================================
+📨 Chat Request
+Session ID: session-1770920413363-0973x187r
+Query: Is there any other way
+Active sessions: []
+============================================================
+
+📤 No uploaded documents in this session
+
+💬 Query Type: Document query
+
+🔍 Searching company documents...
+
+======================================================================
+🔍 Hybrid search for: 'Is there any other way'
+📊 Target results: 15
+📄 Max chunks per document: 7
+======================================================================
+
+📥 Processing search results with per-document limiting...
+
+📊 Retrieval Statistics:
+   ✓ Total unique documents: 5
+   ✓ Total chunks retrieved: 15
+
+📄 Chunks per document:
+   ⚠️ LIMITED Adara+Team+Member+Handbook+V.092020_0e180c71-a30e-4b77-b1c0-929224e06da4.pdf: 7 chunks
+   ✓ Adara+Communities%2c+Customer+Service+Policy+17_ec1029b7-949a-49ad-8031-73292faedb27.pdf: 2 chunks
+   ✓ SECURITY_60311429-9a1f-4ac4-95fc-02c9cbec39f3_4cf3472e-ccd6-4ea2-b4e4-cd1e5a5bd311.pdf: 1 chunks
+   ✓ M_ADARA_COMMUNITYPOLICIES_0f4b5270-05d7-4c94-b14a-ba5c76c60e91_ee8e1d21-fd8f-4840-b062-0a8e5dc43271.pdf: 4 chunks
+   ✓ Adara+-+How-to-Record-a-Unit_101eb335-ee57-4448-8f8a-256fa2e47d67.pdf: 1 chunks
+======================================================================
+
+📁 Found 15 company documents
+  1. Adara+Team+Member+Handbook+V.092020_0e180c71-a30e-4b77-b1c0-929224e06da4.pdf
+  2. Adara+Team+Member+Handbook+V.092020_0e180c71-a30e-4b77-b1c0-929224e06da4.pdf
+  3. Adara+Communities%2c+Customer+Service+Policy+17_ec1029b7-949a-49ad-8031-73292faedb27.pdf
+  4. Adara+Team+Member+Handbook+V.092020_0e180c71-a30e-4b77-b1c0-929224e06da4.pdf
+  5. Adara+Team+Member+Handbook+V.092020_0e180c71-a30e-4b77-b1c0-929224e06da4.pdf
+  6. Adara+Team+Member+Handbook+V.092020_0e180c71-a30e-4b77-b1c0-929224e06da4.pdf
+  7. Adara+Team+Member+Handbook+V.092020_0e180c71-a30e-4b77-b1c0-929224e06da4.pdf
+  8. Adara+Team+Member+Handbook+V.092020_0e180c71-a30e-4b77-b1c0-929224e06da4.pdf
+  9. SECURITY_60311429-9a1f-4ac4-95fc-02c9cbec39f3_4cf3472e-ccd6-4ea2-b4e4-cd1e5a5bd311.pdf
+  10. M_ADARA_COMMUNITYPOLICIES_0f4b5270-05d7-4c94-b14a-ba5c76c60e91_ee8e1d21-fd8f-4840-b062-0a8e5dc43271.pdf
+  11. M_ADARA_COMMUNITYPOLICIES_0f4b5270-05d7-4c94-b14a-ba5c76c60e91_ee8e1d21-fd8f-4840-b062-0a8e5dc43271.pdf
+  12. M_ADARA_COMMUNITYPOLICIES_0f4b5270-05d7-4c94-b14a-ba5c76c60e91_ee8e1d21-fd8f-4840-b062-0a8e5dc43271.pdf
+  13. Adara+Communities%2c+Customer+Service+Policy+17_ec1029b7-949a-49ad-8031-73292faedb27.pdf
+  14. Adara+-+How-to-Record-a-Unit_101eb335-ee57-4448-8f8a-256fa2e47d67.pdf
+  15. M_ADARA_COMMUNITYPOLICIES_0f4b5270-05d7-4c94-b14a-ba5c76c60e91_ee8e1d21-fd8f-4840-b062-0a8e5dc43271.pdf
+
+📋 CONTEXT FOR LLM: 15 company documents
+
+📤 SENDING TO LLM (15 document pages):
+  1. 📁 [company] Adara+Team+Member+Handbook+V.092020_0e180c71-a30e-4b77-b1c0-929224e06da4.pdf - Page 19
+      Content length: 994 chars
+  2. 📁 [company] Adara+Team+Member+Handbook+V.092020_0e180c71-a30e-4b77-b1c0-929224e06da4.pdf - Page 16
+      Content length: 975 chars
+  3. 📁 [company] Adara+Communities%2c+Customer+Service+Policy+17_ec1029b7-949a-49ad-8031-73292faedb27.pdf - Page 5
+      Content length: 993 chars
+  4. 📁 [company] Adara+Team+Member+Handbook+V.092020_0e180c71-a30e-4b77-b1c0-929224e06da4.pdf - Page 49
+      Content length: 863 chars
+  5. 📁 [company] Adara+Team+Member+Handbook+V.092020_0e180c71-a30e-4b77-b1c0-929224e06da4.pdf - Page 17
+      Content length: 992 chars
+  6. 📁 [company] Adara+Team+Member+Handbook+V.092020_0e180c71-a30e-4b77-b1c0-929224e06da4.pdf - Page 19
+      Content length: 922 chars
+  7. 📁 [company] Adara+Team+Member+Handbook+V.092020_0e180c71-a30e-4b77-b1c0-929224e06da4.pdf - Page 29
+      Content length: 983 chars
+  8. 📁 [company] Adara+Team+Member+Handbook+V.092020_0e180c71-a30e-4b77-b1c0-929224e06da4.pdf - Page 16
+      Content length: 1000 chars
+  9. 📁 [company] SECURITY_60311429-9a1f-4ac4-95fc-02c9cbec39f3_4cf3472e-ccd6-4ea2-b4e4-cd1e5a5bd311.pdf - Page 1
+      Content length: 957 chars
+  10. 📁 [company] M_ADARA_COMMUNITYPOLICIES_0f4b5270-05d7-4c94-b14a-ba5c76c60e91_ee8e1d21-fd8f-4840-b062-0a8e5dc43271.pdf - Page 9
+      Content length: 982 chars
+  11. 📁 [company] M_ADARA_COMMUNITYPOLICIES_0f4b5270-05d7-4c94-b14a-ba5c76c60e91_ee8e1d21-fd8f-4840-b062-0a8e5dc43271.pdf - Page 8
+      Content length: 964 chars
+  12. 📁 [company] M_ADARA_COMMUNITYPOLICIES_0f4b5270-05d7-4c94-b14a-ba5c76c60e91_ee8e1d21-fd8f-4840-b062-0a8e5dc43271.pdf - Page 11
+      Content length: 813 chars
+  13. 📁 [company] Adara+Communities%2c+Customer+Service+Policy+17_ec1029b7-949a-49ad-8031-73292faedb27.pdf - Page 5
+      Content length: 927 chars
+  14. 📁 [company] Adara+-+How-to-Record-a-Unit_101eb335-ee57-4448-8f8a-256fa2e47d67.pdf - Page 1
+      Content length: 929 chars
+  15. 📁 [company] M_ADARA_COMMUNITYPOLICIES_0f4b5270-05d7-4c94-b14a-ba5c76c60e91_ee8e1d21-fd8f-4840-b062-0a8e5dc43271.pdf - Page 4
+      Content length: 856 chars
+============================================================
+
+📊 Prompt Statistics:
+   Total prompt: 16,477 chars (~4,119 tokens)
+   Uploaded content: 0 chars (FULL, no truncation)
+   Company content: 14,150 chars
+   Context window available: ~128,000 tokens
+   Usage: 3.2%
+   Documents provided: 15
+📝 Including 3 previous exchanges in context
+✅ Generated response with inline citations
+   Documents provided: 15
+   Unique documents cited: 2
+     [1] 📁 Adara+Team+Member+Handbook+V.092020_0e180c71-a30e-4b77-b1c0-929224e06da4.pdf
+     [2] 📁 SECURITY_60311429-9a1f-4ac4-95fc-02c9cbec39f3_4cf3472e-ccd6-4ea2-b4e4-cd1e5a5bd311.pdf
+
+📋 Sources after deduplication: 2
+  1. 📁 📁 Adara+Team+Member+Handbook+V.092020_0e180c71-a30e-4b77-b1c0-929224e06da4.pdf
+  2. 📁 📁 SECURITY_60311429-9a1f-4ac4-95fc-02c9cbec39f3_4cf3472e-ccd6-4ea2-b4e4-cd1e5a5bd311.pdf
+INFO:     50.172.237.10:0 - "POST /api/chat HTTP/1.1" 200 OK
+INFO:     50.172.237.10:0 - "OPTIONS /api/chat HTTP/1.1" 200 OK
+
+============================================================
+📨 Chat Request
+Session ID: session-1770920413363-0973x187r
+Query: You are a bad boy
+Active sessions: []
+============================================================
+
+📤 No uploaded documents in this session
+
+💬 Query Type: Document query
+
+🔍 Searching company documents...
+
+======================================================================
+🔍 Hybrid search for: 'You are a bad boy'
+📊 Target results: 15
+📄 Max chunks per document: 7
+======================================================================
+
+📥 Processing search results with per-document limiting...
+
+📊 Retrieval Statistics:
+   ✓ Total unique documents: 4
+   ✓ Total chunks retrieved: 15
+
+📄 Chunks per document:
+   ✓ M_ADARA_COMMUNITYPOLICIES_0f4b5270-05d7-4c94-b14a-ba5c76c60e91_ee8e1d21-fd8f-4840-b062-0a8e5dc43271.pdf: 4 chunks
+   ⚠️ LIMITED Adara+Team+Member+Handbook+V.092020_0e180c71-a30e-4b77-b1c0-929224e06da4.pdf: 7 chunks
+   ✓ Adara+-+How-to-Record-a-Unit_101eb335-ee57-4448-8f8a-256fa2e47d67.pdf: 2 chunks
+   ✓ ACCELRNT_a7813d6c-10f4-43dc-837d-afc9bd830442.pdf: 2 chunks
+======================================================================
+
+📁 Found 15 company documents
+  1. M_ADARA_COMMUNITYPOLICIES_0f4b5270-05d7-4c94-b14a-ba5c76c60e91_ee8e1d21-fd8f-4840-b062-0a8e5dc43271.pdf
+  2. Adara+Team+Member+Handbook+V.092020_0e180c71-a30e-4b77-b1c0-929224e06da4.pdf
+  3. M_ADARA_COMMUNITYPOLICIES_0f4b5270-05d7-4c94-b14a-ba5c76c60e91_ee8e1d21-fd8f-4840-b062-0a8e5dc43271.pdf
+  4. Adara+Team+Member+Handbook+V.092020_0e180c71-a30e-4b77-b1c0-929224e06da4.pdf
+  5. Adara+Team+Member+Handbook+V.092020_0e180c71-a30e-4b77-b1c0-929224e06da4.pdf
+  6. Adara+-+How-to-Record-a-Unit_101eb335-ee57-4448-8f8a-256fa2e47d67.pdf
+  7. Adara+Team+Member+Handbook+V.092020_0e180c71-a30e-4b77-b1c0-929224e06da4.pdf
+  8. Adara+-+How-to-Record-a-Unit_101eb335-ee57-4448-8f8a-256fa2e47d67.pdf
+  9. Adara+Team+Member+Handbook+V.092020_0e180c71-a30e-4b77-b1c0-929224e06da4.pdf
+  10. Adara+Team+Member+Handbook+V.092020_0e180c71-a30e-4b77-b1c0-929224e06da4.pdf
+  11. Adara+Team+Member+Handbook+V.092020_0e180c71-a30e-4b77-b1c0-929224e06da4.pdf
+  12. M_ADARA_COMMUNITYPOLICIES_0f4b5270-05d7-4c94-b14a-ba5c76c60e91_ee8e1d21-fd8f-4840-b062-0a8e5dc43271.pdf
+  13. M_ADARA_COMMUNITYPOLICIES_0f4b5270-05d7-4c94-b14a-ba5c76c60e91_ee8e1d21-fd8f-4840-b062-0a8e5dc43271.pdf
+  14. ACCELRNT_a7813d6c-10f4-43dc-837d-afc9bd830442.pdf
+  15. ACCELRNT_a7813d6c-10f4-43dc-837d-afc9bd830442.pdf
+
+📋 CONTEXT FOR LLM: 15 company documents
+
+📤 SENDING TO LLM (15 document pages):
+  1. 📁 [company] M_ADARA_COMMUNITYPOLICIES_0f4b5270-05d7-4c94-b14a-ba5c76c60e91_ee8e1d21-fd8f-4840-b062-0a8e5dc43271.pdf - Page 4
+      Content length: 928 chars
+  2. 📁 [company] Adara+Team+Member+Handbook+V.092020_0e180c71-a30e-4b77-b1c0-929224e06da4.pdf - Page 45
+      Content length: 997 chars
+  3. 📁 [company] M_ADARA_COMMUNITYPOLICIES_0f4b5270-05d7-4c94-b14a-ba5c76c60e91_ee8e1d21-fd8f-4840-b062-0a8e5dc43271.pdf - Page 4
+      Content length: 870 chars
+  4. 📁 [company] Adara+Team+Member+Handbook+V.092020_0e180c71-a30e-4b77-b1c0-929224e06da4.pdf - Page 46
+      Content length: 848 chars
+  5. 📁 [company] Adara+Team+Member+Handbook+V.092020_0e180c71-a30e-4b77-b1c0-929224e06da4.pdf - Page 45
+      Content length: 936 chars
+  6. 📁 [company] Adara+-+How-to-Record-a-Unit_101eb335-ee57-4448-8f8a-256fa2e47d67.pdf - Page 1
+      Content length: 929 chars
+  7. 📁 [company] Adara+Team+Member+Handbook+V.092020_0e180c71-a30e-4b77-b1c0-929224e06da4.pdf - Page 44
+      Content length: 999 chars
+  8. 📁 [company] Adara+-+How-to-Record-a-Unit_101eb335-ee57-4448-8f8a-256fa2e47d67.pdf - Page 1
+      Content length: 579 chars
+  9. 📁 [company] Adara+Team+Member+Handbook+V.092020_0e180c71-a30e-4b77-b1c0-929224e06da4.pdf - Page 44
+      Content length: 1000 chars
+  10. 📁 [company] Adara+Team+Member+Handbook+V.092020_0e180c71-a30e-4b77-b1c0-929224e06da4.pdf - Page 45
+      Content length: 983 chars
+  11. 📁 [company] Adara+Team+Member+Handbook+V.092020_0e180c71-a30e-4b77-b1c0-929224e06da4.pdf - Page 31
+      Content length: 930 chars
+  12. 📁 [company] M_ADARA_COMMUNITYPOLICIES_0f4b5270-05d7-4c94-b14a-ba5c76c60e91_ee8e1d21-fd8f-4840-b062-0a8e5dc43271.pdf - Page 6
+      Content length: 891 chars
+  13. 📁 [company] M_ADARA_COMMUNITYPOLICIES_0f4b5270-05d7-4c94-b14a-ba5c76c60e91_ee8e1d21-fd8f-4840-b062-0a8e5dc43271.pdf - Page 1
+      Content length: 999 chars
+  14. 📁 [company] ACCELRNT_a7813d6c-10f4-43dc-837d-afc9bd830442.pdf - Page 1
+      Content length: 940 chars
+  15. 📁 [company] ACCELRNT_a7813d6c-10f4-43dc-837d-afc9bd830442.pdf - Page 1
+      Content length: 918 chars
+============================================================
+
+📊 Prompt Statistics:
+   Total prompt: 15,972 chars (~3,993 tokens)
+   Uploaded content: 0 chars (FULL, no truncation)
+   Company content: 13,747 chars
+   Context window available: ~128,000 tokens
+   Usage: 3.1%
+   Documents provided: 15
+📝 Including 4 previous exchanges in context
+✅ Generated response with inline citations
+   Documents provided: 15
+   Unique documents cited: 1
+     [1] 📁 Adara+Team+Member+Handbook+V.092020_0e180c71-a30e-4b77-b1c0-929224e06da4.pdf
+
+📋 Sources after deduplication: 1
+  1. 📁 📁 Adara+Team+Member+Handbook+V.092020_0e180c71-a30e-4b77-b1c0-929224e06da4.pdf
+INFO:     50.172.237.10:0 - "POST /api/chat HTTP/1.1" 200 OK

@@ -1,22 +1,53 @@
-# backend/services/llm_service.py - WITH FIXED FALLBACK CITATIONS
+# backend/services/llm_service.py - WITH REDIS HISTORY, TRUNCATION, RETRY, ASYNC
 
 from typing import List, Dict, Optional
-from openai import AzureOpenAI
+from openai import AzureOpenAI, RateLimitError, APIConnectionError
 import uuid
 import re
+import json
+import asyncio
 import config
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+from services.redis_service import get_redis_client
+
 
 class LLMService:
     def __init__(self):
-        self.conversation_history = {}
-        
         self.client = AzureOpenAI(
             api_key=config.AZURE_OPENAI_API_KEY,
             api_version=config.AZURE_OPENAI_API_VERSION,
             azure_endpoint=config.AZURE_OPENAI_ENDPOINT
         )
         self.model = config.AZURE_OPENAI_DEPLOYMENT_NAME
-    
+
+    # ── Redis history helpers ─────────────────────────────────────────────────────
+
+    async def _load_history(self, session_id: str) -> list:
+        """Load conversation history from Redis"""
+        try:
+            redis_client = await get_redis_client()
+            data = await redis_client.get(f"conv:{session_id}")
+            return json.loads(data) if data else []
+        except Exception as e:
+            print(f"⚠️  Redis history load error: {e}")
+            return []
+
+    async def _save_history(self, session_id: str, history: list):
+        """Save conversation history to Redis with TTL, truncated to MAX_CONVERSATION_TURNS"""
+        try:
+            if len(history) > config.MAX_CONVERSATION_TURNS:
+                history = history[-config.MAX_CONVERSATION_TURNS:]
+            redis_client = await get_redis_client()
+            await redis_client.setex(
+                f"conv:{session_id}",
+                config.SESSION_TTL_SECONDS,
+                json.dumps(history)
+            )
+        except Exception as e:
+            print(f"⚠️  Redis history save error: {e}")
+
+    # ── Prompt builders (unchanged) ───────────────────────────────────────────────
+
     def _build_system_prompt(self, has_uploads: bool = False) -> str:
         base_prompt = """You are an AI assistant for YottaReal property management software, helping leasing agents, property managers, and district managers retrieve information.
 
@@ -71,25 +102,20 @@ SOURCE ATTRIBUTION:
 - Provide comprehensive information from the cited documents in bullet format"""
 
         return base_prompt
-    
+
     def _build_prompt(self, query: str, context: List[Dict], has_uploads: bool = False) -> tuple:
-        # Separate uploaded vs company documents
         uploaded_docs = [doc for doc in context if doc.get("source_type") == "uploaded"]
         company_docs = [doc for doc in context if doc.get("source_type") == "company"]
-        
+
         context_text = ""
         doc_number = 1
-        doc_mapping = {}  # Maps doc number to filename, download_url, pages
-        
-        # Add uploaded documents first (higher priority)
+        doc_mapping = {}
+
         if uploaded_docs:
             context_text += "=== UPLOADED DOCUMENTS (User's Files) ===\n"
             for doc in uploaded_docs:
                 page_num = doc.get('page_number', 1)
-                
                 context_text += f"\n[Document {doc_number} - Page {page_num}: {doc['filename']}]\n"
-                
-                # Track this doc
                 if doc_number not in doc_mapping:
                     doc_mapping[doc_number] = {
                         "filename": doc['filename'],
@@ -98,22 +124,17 @@ SOURCE ATTRIBUTION:
                         "pages": set()
                     }
                 doc_mapping[doc_number]["pages"].add(page_num)
-                
                 context_text += f"{doc['content']}\n"
                 context_text += f"(End of Document {doc_number} - Page {page_num})\n"
                 doc_number += 1
-        
-        # Add company documents
+
         if company_docs:
             if uploaded_docs:
                 context_text += "\n" + "="*60 + "\n\n"
             context_text += "=== COMPANY DOCUMENTS (Policies, Handbooks, Procedures) ===\n"
             for doc in company_docs:
                 page_num = doc.get('page_number', 1)
-                
                 context_text += f"\n[Document {doc_number} - Page {page_num}: {doc['filename']}]\n"
-                
-                # Track this doc
                 if doc_number not in doc_mapping:
                     doc_mapping[doc_number] = {
                         "filename": doc['filename'],
@@ -122,15 +143,13 @@ SOURCE ATTRIBUTION:
                         "pages": set()
                     }
                 doc_mapping[doc_number]["pages"].add(page_num)
-                
-                # Allow up to 10,000 chars per company doc
                 content = doc['content'][:10000]
                 context_text += f"{content}\n"
                 if len(doc['content']) > 10000:
                     context_text += f"... (content truncated, original length: {len(doc['content'])} chars)\n"
                 context_text += f"(End of Document {doc_number} - Page {page_num})\n"
                 doc_number += 1
-        
+
         prompt = f"""Context from documents:
 
 {context_text}
@@ -138,20 +157,14 @@ SOURCE ATTRIBUTION:
 User question: {query}
 
 Answer (use bullet points on separate lines with [N → Page X] citations):"""
-        
+
         return prompt, doc_mapping
-    
+
     def _extract_citations_and_renumber(self, response_text: str, doc_mapping: Dict) -> tuple:
-        """
-        Extract citations, deduplicate by filename, renumber sequentially, 
-        and update response text with new numbers
-        """
-        # Find all [N → Page X] or [N] patterns
         citation_pattern = r'\[(\d+)(?:\s*→\s*Page\s*(\d+))?\]'
         matches = re.finditer(citation_pattern, response_text)
-        
-        # Track which doc numbers were cited
-        cited_docs = {}  # {doc_num: page_nums}
+
+        cited_docs = {}
         for match in matches:
             doc_num = int(match.group(1))
             page_num = match.group(2)
@@ -159,17 +172,14 @@ Answer (use bullet points on separate lines with [N → Page X] citations):"""
                 cited_docs[doc_num] = set()
             if page_num:
                 cited_docs[doc_num].add(int(page_num))
-        
-        # Build unique sources (deduplicate by filename)
-        unique_sources = {}  # {filename: {"new_num": int, "type": str, "url": str, "old_nums": [int]}}
+
+        unique_sources = {}
         new_num = 1
-        
+
         for doc_num in sorted(cited_docs.keys()):
             if doc_num in doc_mapping:
                 doc_info = doc_mapping[doc_num]
                 filename = doc_info['filename']
-                
-                # Check if we've already seen this filename
                 if filename not in unique_sources:
                     unique_sources[filename] = {
                         "new_num": new_num,
@@ -178,31 +188,26 @@ Answer (use bullet points on separate lines with [N → Page X] citations):"""
                         "old_nums": []
                     }
                     new_num += 1
-                
                 unique_sources[filename]["old_nums"].append(doc_num)
-        
-        # Create renumbering map: old doc num → new sequential num
-        renumber_map = {}  # {old_num: new_num}
+
+        renumber_map = {}
         for filename, info in unique_sources.items():
             for old_num in info["old_nums"]:
                 renumber_map[old_num] = info["new_num"]
-        
-        # Replace citation numbers in response text
+
         def replace_citation(match):
             old_num = int(match.group(1))
             page_num = match.group(2)
-            
             if old_num in renumber_map:
                 new_num = renumber_map[old_num]
                 if page_num:
                     return f"[{new_num} → Page {page_num}]"
                 else:
                     return f"[{new_num}]"
-            return match.group(0)  # Keep original if not in map
-        
+            return match.group(0)
+
         updated_text = re.sub(citation_pattern, replace_citation, response_text)
-        
-        # Build sources list with sequential numbers
+
         sources = []
         for filename, info in sorted(unique_sources.items(), key=lambda x: x[1]["new_num"]):
             icon = "📤" if info["type"] == "uploaded" else "📁"
@@ -212,18 +217,55 @@ Answer (use bullet points on separate lines with [N → Page X] citations):"""
                 "download_url": info.get("download_url"),
                 "citation_number": info["new_num"]
             })
-        
+
         return updated_text, sources
-    
+
     def _clean_response(self, response_text: str) -> str:
-        """Remove unnecessary markdown (keep [N → Page X] citations)"""
-        # Just clean up any ** markdown
         cleaned = re.sub(r'\*\*', '', response_text)
         return cleaned.strip()
-    
+
+    # ── OpenAI call with tenacity retry ──────────────────────────────────────────
+
+    @retry(
+        retry=retry_if_exception_type((RateLimitError, APIConnectionError)),
+        wait=wait_exponential(multiplier=1, min=4, max=60),
+        stop=stop_after_attempt(3)
+    )
+    def _call_openai_sync(self, messages: list) -> str:
+        """Synchronous OpenAI call with retry on rate limit / connection errors"""
+        response = self.client.chat.completions.create(
+            model=self.model,
+            messages=messages,
+            temperature=0.3,
+            max_tokens=2500,
+            timeout=config.REQUEST_TIMEOUT_SECONDS
+        )
+        return response.choices[0].message.content
+
+    async def _generate_azure_openai(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        history: list
+    ) -> str:
+        messages = [{"role": "system", "content": system_prompt}]
+
+        for msg in history:
+            messages.append({"role": "user", "content": msg["query"]})
+            messages.append({"role": "assistant", "content": msg["response"]})
+
+        messages.append({"role": "user", "content": user_prompt})
+
+        print(f"📝 Including {len(history)} previous exchanges in context")
+
+        # Run sync OpenAI call off the event loop
+        return await asyncio.to_thread(self._call_openai_sync, messages)
+
+    # ── Main entry point ──────────────────────────────────────────────────────────
+
     async def generate_response(
-        self, 
-        query: str, 
+        self,
+        query: str,
         context: List[Dict],
         session_id: Optional[str] = None,
         has_uploads: bool = False,
@@ -231,20 +273,18 @@ Answer (use bullet points on separate lines with [N → Page X] citations):"""
     ) -> Dict:
         if not session_id:
             session_id = str(uuid.uuid4())
-        
-        if session_id not in self.conversation_history:
-            self.conversation_history[session_id] = []
-        
+
+        # Load history from Redis
+        history = await self._load_history(session_id)
+
         system_prompt = self._build_system_prompt(has_uploads)
         user_prompt, doc_mapping = self._build_prompt(query, context, has_uploads)
-        
-        # Calculate actual prompt size
+
         total_chars = len(user_prompt)
         estimated_tokens = total_chars // 4
-        
         uploaded_chars = sum(len(doc['content']) for doc in context if doc.get('source_type') == 'uploaded')
         company_chars = sum(min(len(doc['content']), 10000) for doc in context if doc.get('source_type') == 'company')
-        
+
         print(f"📊 Prompt Statistics:")
         print(f"   Total prompt: {total_chars:,} chars (~{estimated_tokens:,} tokens)")
         print(f"   Uploaded content: {uploaded_chars:,} chars (FULL, no truncation)")
@@ -252,18 +292,14 @@ Answer (use bullet points on separate lines with [N → Page X] citations):"""
         print(f"   Context window available: ~128,000 tokens")
         print(f"   Usage: {(estimated_tokens/128000)*100:.1f}%")
         print(f"   Documents provided: {len(doc_mapping)}")
-        
+        print(f"   History turns: {len(history)}/{config.MAX_CONVERSATION_TURNS}")
+
         try:
-            response = await self._generate_azure_openai(
-                system_prompt, 
-                user_prompt, 
-                session_id
-            )
-            
-            # Extract citations, deduplicate, renumber, and update text
+            response = await self._generate_azure_openai(system_prompt, user_prompt, history)
+
             cleaned_response = self._clean_response(response)
             updated_response, sources = self._extract_citations_and_renumber(cleaned_response, doc_mapping)
-            
+
             print(f"✅ Generated response with inline citations")
             print(f"   Documents provided: {len(doc_mapping)}")
             print(f"   Unique documents cited: {len(sources)}")
@@ -272,22 +308,18 @@ Answer (use bullet points on separate lines with [N → Page X] citations):"""
                     print(f"     [{src['citation_number']}] {src['filename']}")
             else:
                 print(f"   ⚠️  No documents cited")
-            
-            # Store conversation
-            self.conversation_history[session_id].append({
-                "query": query,
-                "response": updated_response
-            })
-            
-            # If no citations found, fall back to showing all docs (WITH CITATION NUMBERS)
+
+            # Save updated history to Redis (auto-truncates to MAX_CONVERSATION_TURNS)
+            history.append({"query": query, "response": updated_response})
+            await self._save_history(session_id, history)
+
+            # Fallback: show all provided docs if no citations found
             if not sources and context:
-                # Only show fallback if there are enough docs (likely a real query)
                 if len(context) >= 5:
                     print(f"   ⚠️  Falling back to showing all provided documents")
                     sources = []
                     seen_files = set()
-                    citation_num = 1  # Start citation numbering
-                    
+                    citation_num = 1
                     for doc in context:
                         filename = doc["filename"]
                         if filename not in seen_files:
@@ -298,19 +330,18 @@ Answer (use bullet points on separate lines with [N → Page X] citations):"""
                                 "filename": f"{icon} {filename}",
                                 "type": doc_type,
                                 "download_url": doc.get("download_url"),
-                                "citation_number": citation_num  # Add citation number
+                                "citation_number": citation_num
                             })
                             citation_num += 1
                 else:
-                    # Likely casual chat that slipped through - don't show sources
                     print(f"   ℹ️  No citations and few docs - likely casual chat, not showing sources")
-            
+
             return {
                 "answer": updated_response,
                 "sources": sources,
                 "session_id": session_id
             }
-        
+
         except Exception as e:
             print(f"❌ LLM generation error: {e}")
             import traceback
@@ -320,32 +351,3 @@ Answer (use bullet points on separate lines with [N → Page X] citations):"""
                 "sources": [],
                 "session_id": session_id
             }
-    
-    async def _generate_azure_openai(
-        self, 
-        system_prompt: str, 
-        user_prompt: str,
-        session_id: str
-    ) -> str:
-        messages = [{"role": "system", "content": system_prompt}]
-        
-        # Add ALL conversation history
-        for msg in self.conversation_history[session_id]:
-            messages.append({"role": "user", "content": msg["query"]})
-            messages.append({"role": "assistant", "content": msg["response"]})
-        
-        # Add current message
-        messages.append({"role": "user", "content": user_prompt})
-        
-        # Log conversation length for monitoring
-        total_history_messages = len(self.conversation_history[session_id])
-        print(f"📝 Including {total_history_messages} previous exchanges in context")
-        
-        response = self.client.chat.completions.create(
-            model=self.model,
-            messages=messages,
-            temperature=0.3,
-            max_tokens=2500
-        )
-        
-        return response.choices[0].message.content

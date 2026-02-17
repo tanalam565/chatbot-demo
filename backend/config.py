@@ -39,8 +39,26 @@ CHATBOT_API_KEY = os.getenv("CHATBOT_API_KEY", "")
 
 # Application Settings
 MAX_SEARCH_RESULTS = 15
-CHUNK_SIZE = 2000
-CHUNK_OVERLAP = 500
+CHUNK_SIZE = 1000
+CHUNK_OVERLAP = 200
 
-# Retruval Settings: Maximum chunks to retrieve from a single parent document
+# Retrieval Settings
 MAX_CHUNKS_PER_DOCUMENT = 7
+
+# Redis Configuration
+REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
+
+# Session and History Settings
+SESSION_TTL_SECONDS = int(os.getenv("SESSION_TTL_SECONDS", "7200"))  # 2 hours
+MAX_CONVERSATION_TURNS = int(os.getenv("MAX_CONVERSATION_TURNS", "10"))
+
+# File Upload Limits
+MAX_FILE_SIZE_MB = int(os.getenv("MAX_FILE_SIZE_MB", "50"))
+MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024
+
+# Rate Limiting
+RATE_LIMIT_CHAT = os.getenv("RATE_LIMIT_CHAT", "20/minute")
+RATE_LIMIT_UPLOAD = os.getenv("RATE_LIMIT_UPLOAD", "5/minute")
+
+# Request Timeouts
+REQUEST_TIMEOUT_SECONDS = int(os.getenv("REQUEST_TIMEOUT_SECONDS", "60"))
