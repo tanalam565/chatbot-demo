@@ -14,6 +14,7 @@ function ChatInterface() {
   const [copiedIndex, setCopiedIndex] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState([]);
+  const [uploadsRemaining, setUploadsRemaining] = useState(5); // Track remaining uploads
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
   const citationsRef = useRef({});
@@ -197,10 +198,17 @@ function ChatInterface() {
             success: true,
             pages: result.pages_extracted
           });
+
+          // Update remaining uploads
+          if (result.uploads_remaining !== undefined) {
+            setUploadsRemaining(result.uploads_remaining);
+          }
         } else {
+          const error = await response.json();
           uploadResults.push({
             name: file.name,
-            success: false
+            success: false,
+            error: error.detail || 'Upload failed'
           });
         }
       }
@@ -208,6 +216,8 @@ function ChatInterface() {
       setUploadedFiles(prev => [...prev, ...uploadResults.filter(r => r.success)]);
 
       const successCount = uploadResults.filter(r => r.success).length;
+      const failedCount = uploadResults.filter(r => !r.success).length;
+
       if (successCount > 0) {
         const successFiles = uploadResults.filter(r => r.success);
         const fileDetails = successFiles.map(f =>
@@ -216,10 +226,25 @@ function ChatInterface() {
 
         const systemMessage = {
           role: 'system',
-          content: `✓ Uploaded ${successCount} document(s): ${fileDetails}.`,
+          content: `✓ Uploaded ${successCount} document(s): ${fileDetails}. Note: Only the first 15 pages of each file are read. ${uploadsRemaining} upload(s) remaining.`,
           timestamp: new Date()
         };
         setMessages(prev => [...prev, systemMessage]);
+      }
+
+      if (failedCount > 0) {
+        const failedFiles = uploadResults.filter(r => !r.success);
+        const errorDetails = failedFiles.map(f =>
+          `${f.name}: ${f.error || 'Upload failed'}`
+        ).join('; ');
+
+        const errorMessage = {
+          role: 'system',
+          content: `✗ Failed to upload ${failedCount} document(s). ${errorDetails}`,
+          timestamp: new Date(),
+          error: true
+        };
+        setMessages(prev => [...prev, errorMessage]);
       }
 
     } catch (error) {
@@ -263,6 +288,7 @@ function ChatInterface() {
 
       if (response.ok) {
         setUploadedFiles([]);
+        setUploadsRemaining(5); // Reset to max
         const systemMessage = {
           role: 'system',
           content: '✓ All uploaded documents have been deleted.',
@@ -342,12 +368,12 @@ function ChatInterface() {
           onChange={handleFileUpload}
           accept=".pdf,.jpg,.jpeg,.png,.tiff,.bmp,.docx,.txt"
           multiple
-          disabled={uploading}
+          disabled={uploading || uploadsRemaining === 0}
         />
-        <label htmlFor="file-upload" className={`upload-button ${uploading ? 'uploading' : ''}`}>
-          {uploading ? 'Uploading...' : 'Upload Documents'}
+        <label htmlFor="file-upload" className={`upload-button ${uploading || uploadsRemaining === 0 ? 'uploading' : ''}`}>
+          {uploading ? 'Uploading...' : uploadsRemaining === 0 ? 'Upload Limit Reached' : 'Upload Documents'}
         </label>
-        <span className="upload-limits">Max 15MB · First 15 pages only per upload</span>
+        <span className="upload-limits">Max 15MB · First 15 pages · {uploadsRemaining} uploads left</span>
         {uploadedFiles.length > 0 && (
           <>
             <span className="uploaded-count">

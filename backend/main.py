@@ -1,4 +1,4 @@
-# backend/main.py - WITH CONNECTION POOLING
+# backend/main.py - WITH REDIS SESSIONS, RATE LIMITING, FILE VALIDATION
 
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Security, Depends, UploadFile, File, Form, Request
@@ -18,7 +18,6 @@ from services.azure_search_service import AzureSearchService
 from services.llm_service import LLMService
 from services.document_intelligence_service import DocumentIntelligenceService
 from services.redis_service import get_redis_client, close_redis
-from services.http_client_service import close_shared_http_client
 import config
 
 # ── File validation via magic bytes (not trusting content-type header) ──────────
@@ -59,19 +58,11 @@ def validate_file_content(content: bytes, content_type: str) -> bool:
     return False
 
 
-# ── Lifespan: close Redis pool and HTTP client on shutdown ───────────────────────
+# ── Lifespan: close Redis pool on shutdown ───────────────────────────────────────
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    print("\n" + "="*60)
-    print("🚀 Starting application with connection pooling")
-    print("="*60)
     yield
-    print("\n" + "="*60)
-    print("🛑 Shutting down - closing connections")
-    print("="*60)
     await close_redis()
-    close_shared_http_client()  # ← Close shared HTTP client
-    print("✓ All connections closed")
 
 
 # ── Rate limiter ─────────────────────────────────────────────────────────────────
@@ -291,6 +282,19 @@ async def upload_document(
         print(f"Filename: {file.filename}")
         print(f"Content-Type: {file.content_type}")
 
+        # Check upload count for this session
+        redis_client = await get_redis_client()
+        session_key = f"session:{session_id}"
+        session_data = await redis_client.get(session_key)
+        current_docs = json.loads(session_data) if session_data else []
+
+        if len(current_docs) >= config.MAX_UPLOADS_PER_SESSION:
+            print(f"❌ Upload limit reached: {len(current_docs)}/{config.MAX_UPLOADS_PER_SESSION}")
+            raise HTTPException(
+                status_code=400,
+                detail=f"Upload limit reached. Maximum {config.MAX_UPLOADS_PER_SESSION} files per session."
+            )
+
         # Validate content-type header
         if file.content_type not in ALLOWED_CONTENT_TYPES:
             raise HTTPException(
@@ -332,28 +336,24 @@ async def upload_document(
 
         print(f"✅ Extracted {len(extraction_result['text'])} characters from {extraction_result['page_count']} pages")
 
-        # Store in Redis with TTL
-        redis_client = await get_redis_client()
-        session_key = f"session:{session_id}"
-        session_data = await redis_client.get(session_key)
-        session_docs = json.loads(session_data) if session_data else []
-
-        session_docs.append({
+        # Add to session documents
+        current_docs.append({
             "filename": file.filename,
             "content": extraction_result['text'],
             "page_texts": extraction_result.get('page_texts', []),
             "page_count": extraction_result['page_count']
         })
 
+        # Store in Redis with TTL
         await redis_client.setex(
             session_key,
             config.SESSION_TTL_SECONDS,
-            json.dumps(session_docs)
+            json.dumps(current_docs)
         )
 
         print(f"✅ Stored in Redis session: {session_id}")
-        print(f"📊 Session now has {len(session_docs)} documents:")
-        for i, doc in enumerate(session_docs, 1):
+        print(f"📊 Session now has {len(current_docs)}/{config.MAX_UPLOADS_PER_SESSION} documents:")
+        for i, doc in enumerate(current_docs, 1):
             page_count = len(doc.get('page_texts', [])) if 'page_texts' in doc else doc.get('page_count', 1)
             print(f"   {i}. {doc['filename']} ({page_count} pages, {len(doc.get('content', ''))} chars)")
         print(f"{'='*60}\n")
@@ -364,7 +364,8 @@ async def upload_document(
             "session_id": session_id,
             "pages_extracted": extraction_result['page_count'],
             "text_length": len(extraction_result['text']),
-            "immediate_access": True
+            "immediate_access": True,
+            "uploads_remaining": config.MAX_UPLOADS_PER_SESSION - len(current_docs)
         }
 
     except HTTPException:
